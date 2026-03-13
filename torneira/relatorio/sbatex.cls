@@ -184,7 +184,9 @@ Automa\c{c}\~{a}o em \today}
   \setboolean{isSubmission}{false}
 
   % pass options to class article
-  \PassOptionsToClass{10pt,twocolumn,oneside}{article}
+  \PassOptionsToClass{10pt,
+  %twocolumn,oneside % single column seemed more readable, since this is not a conference paper, but a report
+  }{article}
   \AtEndOfPackage{
 
     % section layout
