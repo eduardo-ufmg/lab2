@@ -1,0 +1,69 @@
+\documentclass[conference,harvard,brazil,english]{sbatex}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+
+\begin{document}
+
+\title{Controle de Temperatura de uma Torneira Elétrica}
+
+% authors only; addresses and emails have been removed from the class
+\author{Eduardo Henrique Basilio de Carvalho}
+\author{Joao Vitor Braga da Silva Alves}
+\author{Renan Neves da Silva}
+
+\maketitle
+
+\selectlanguage{brazil}
+
+\section{Introdução}
+
+O objetivo deste trabalho é alcançar o controle de temperatura de uma torneira elétrica sob as seguintes condições:
+
+\begin{itemize}
+    \item \textbf{Atuador:} Atuação térmica via resistências elétricas com limite de dissipação de 400 W \cite{evangelista2009plataforma}.
+    \item \textbf{Elemento primário:} Transdução de temperatura via termistor NTC em topologia de Ponte de Wheatstone \cite{evangelista2009plataforma} ou sensor integrado linear LM35 \cite{mesquita_roteiro4B2,mesquita_roteiro4A1}.
+    \item \textbf{Placa de aquisição:} Interface digital/analógica utilizando o modelo NI PCI-6221 (16 bits) \cite{evangelista2009plataforma} ou NI PCIe-6321 \cite{mesquita_roteiro4A4,mesquita_roteiro4B1,mesquita_roteiro4A1}.
+    \item \textbf{Tiristor:} Modulação de potência elétrica imposta por TRIAC operando em regime tiristorizado governado pela variação do ângulo de disparo ($\theta$), induzindo não-linearidade estática \cite{evangelista2009plataforma,mesquita_roteiro4B2,mesquita_roteiro4A1}.
+    \item \textbf{Processador:} Arquitetura x86 com processador INTEL Dual Core E2.140 operando à frequência de 1,6 GHz \cite{evangelista2009plataforma}.
+    \item \textbf{Memória do computador:} Capacidade física alocada de 1 GB de memória RAM \cite{evangelista2009plataforma}.
+    \item \textbf{Sistema operacional:} Distribuição Linux Ubuntu operando em \textit{user-space} \cite{evangelista2009plataforma}, estendida para suportar execução em tempo real \cite{mesquita_roteiro4A4}.
+    \item \textbf{Kernel:} Núcleo Linux \textit{vanilla} submetido à camada \textit{Hardware Abstraction Layer} via \textit{patch} RTAI \cite{evangelista2009plataforma}, ou modificado para preempção integral da quase totalidade dos processos via PREEMPT\_RT \cite{mesquita_roteiro4A4,mesquita_roteiro4B1,mesquita_roteiro4A1}.
+    \item \textbf{Bibliotecas:} Dependências de \textit{software} \texttt{Comedilib} e \texttt{Kcomedilib} para E/S em tempo real \cite{evangelista2009plataforma} e a API do \textit{driver} \texttt{NIDAQmx} para abstração de comunicação com o \textit{hardware} de aquisição \cite{mesquita_roteiro4A4}.
+    \item \textbf{Critérios de aceitação:} Validação de estabilidade frente a perturbações em degrau de $1^{\circ}C$, avaliada tanto no centro quanto nos extremos da faixa de operação do atuador térmico \cite{mesquita_roteiro4A5e6}. O determinismo temporal do laço de controle requer a mitigação de latências, quantificadas por meio da mediana das amostras e do desvio absoluto mediano (MAD) \cite{mesquita_roteiro4A4}, além da restrição de \textit{jitter} a 10\% e tempo de ciclo de 20 $\mu s$ \cite{evangelista2009plataforma}.
+\end{itemize}
+
+\section{Caracterização da Confiabilidade Temporal do Kernel de Tempo Real}
+
+Para caracterizar a confiabilidade temporal do kernel de tempo real, o seguinte experimento foi conduzido para $P_\text{configurado} \in \{1,10,100\}\,\text{ms}$:
+
+\begin{enumerate}
+    \item Uma quantidade $N$ de amostras é definida;
+    \item Tarefas em nível de usuário e cíclicas são lançadas. Tais tarefas exercitam carga no tanto no processador quanto no sistema de E/S, este por meio de operações de leitura e escrita em arquivos;
+    \item A função \texttt{DAQmxWaitForNextSampleClock} é invocada em um loop no processo principal, na função \texttt{main}, $N$ vezes;
+    \item Um arranjo de períodos é coletado, no qual cada elemento $P_i$ representa o tempo decorrido entre duas invocações consecutivas da função de espera.
+    \item A média $\bar{P} = \frac{1}{N} \sum_{i=1}^N P_i$ e o desvio padrão $\sigma_P = \sqrt{\frac{1}{N - 1} \sum_{i=1}^N (P_i - \bar{P})^2}$ são calculados e reportados.
+\end{enumerate}
+
+Pela limitação de recursos computacionais, o número de amostras $N$ foi definido como $N = 1000$ para $P_\text{configurado} = 1,\ 10\, \text{ms}$ e $N = 100$ para $P_\text{configurado} = 100\,\text{ms}$.
+
+\begin{table}[ht]
+    \centering
+    \begin{tabular}{r r r}
+        \hline
+        $P_\text{configurado}\ \text{ms}$ & $\bar{P}\ \text{ms}$ & $\sigma_P\ \text{ms}$ \\
+        \hline
+        1                                 & 1.00                 & 0.01                  \\
+        10                                & 10.00                & 0.02                  \\
+        100                               & 100.00               & 0.02                  \\
+        \hline
+    \end{tabular}
+    \caption{Resultados dos experimentos de caracterização temporal do kernel de tempo real.}
+    \label{tab:resultados_temporais}
+\end{table}
+
+A tabela \ref{tab:resultados_temporais} apresenta os resultados dos experimentos de caracterização temporal do kernel de tempo real. Observa-se que a média dos períodos medidos $\bar{P}$ é, nos algarismo significativos considerados, igual ao período configurado $P_\text{configurado}$ para todas as configurações testadas. O desvio padrão $\sigma_P$ é relativamente baixo, indicando que os períodos medidos estão próximos da média, o que sugere um comportamento temporal consistente do kernel de tempo real sob as condições do experimento.
+
+\bibliography{bibliografia}
+
+\end{document}
