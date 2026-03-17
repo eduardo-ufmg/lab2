@@ -14,3 +14,7 @@
     - No experimento, o sistema da bancada correspondente é usado. Este pode ser um computador do qual temos acesso limitado aos recursos, um CLP, um sistema distribuído, ou qualquer outro ambiente que não podemos configurar livremente. Por isso, este repositório não contém necessariamente os códigos, configurações e dados de entrada dos experimentos, nem tem a responsabilidade de gerenciar sua execução, manutenção e versionamento. São responsáveis pelo experimento as próprias bancadas.
     - No processamento, os dados coletados no experimento são processados, analisados e apresentados. Esta parte é feita localmente, e é a única parte que deve ser gerenciada por este repositório. Assim, os códigos, configurações e dados do processamento devem ser armazenados neste repositório.
 - O processamento é feito, a princípio, em Python.
+
+## Configuração do Ambiente
+
+Veja o [repositório pai](github.com/eduardo-ufmg/s20261/).
