@@ -37,6 +37,16 @@ struct period_info
     long long period_ns;
 };
 
+static void inc_period(struct period_info * pinfo)
+{
+    pinfo->next_period.tv_nsec += pinfo->period_ns;
+
+    while (pinfo->next_period.tv_nsec >= NSEC_TO_SEC) {
+        pinfo->next_period.tv_sec++;
+        pinfo->next_period.tv_nsec -= NSEC_TO_SEC;
+    }
+}
+
 static void periodic_task_init(struct period_info * pinfo)
 {
     pinfo->period_ns = SAMPLING_TIME;
@@ -72,9 +82,17 @@ Error:
 
 static void wait_rest_of_period(struct period_info * pinfo)
 {
-    bool32 islate;
-    (void)pinfo;
-    DAQmxWaitForNextSampleClock(AItaskHandle, 15.0, &islate);
+    int ret;
+
+    inc_period(pinfo);
+
+    do {
+        ret = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &pinfo->next_period, NULL);
+    } while (ret == EINTR);
+
+    if (ret != 0) {
+        perror("clock_nanosleep");
+    }
 }
 
 void * simple_cyclic_task(void * data)
