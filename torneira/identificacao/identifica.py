@@ -4,29 +4,25 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from scipy.optimize import lsq_linear
 
 
-def load_experiment_data(
-    file_path: str,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
-    """
-    Load experimental data from a CSV file.
+def load_experiment_data(file_path: str) -> tuple[np.ndarray, np.ndarray] | None:
+    """Load experimental data from a CSV file.
 
     Parameters:
-    file_path (str): The path to the CSV file containing the experimental data.
+        file_path: Path to the CSV file.
 
     Returns:
-    tuple[np.ndarray, np.ndarray, np.ndarray] | None: A tuple containing the loaded data as NumPy arrays, or None if an error occurs.
+        (u, y) as NumPy arrays, or None on failure.
 
-    Note: The CSV file is expected to have columns 'k', 'u', and 'y'.
+    Note: The CSV file is expected to have columns 'u' and 'y'.
     """
 
     try:
         data = pd.read_csv(file_path)
         # Strip whitespace from column headers (e.g., ' u' -> 'u')
         data.columns = data.columns.str.strip()
-        return data["k"].to_numpy(), data["u"].to_numpy(), data["y"].to_numpy()
+        return data["u"].to_numpy(), data["y"].to_numpy()
     except Exception as e:
         print(f"Error loading data: {e}")
         return None
@@ -69,35 +65,11 @@ def plot_data(k: np.ndarray, u: np.ndarray, y: np.ndarray, file_path: str) -> No
     plt.savefig(file_path)
 
 
-def trim_data(
-    k: np.ndarray, u: np.ndarray, y: np.ndarray, start: int, end: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Trim the experimental data to a specified range of time steps.
-
-    Parameters:
-    k (np.ndarray): The time steps of the experiment.
-    u (np.ndarray): The input signal values.
-    y (np.ndarray): The output signal values.
-    start (int): The starting time step for trimming.
-    end (int): The ending time step for trimming.
-
-    Returns:
-    tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing the trimmed data as NumPy arrays.
-
-    Note: This function assumes that the time steps in 'k' are sorted and that 'start' and 'end' are valid indices within the range of 'k'.
-    """
-
-    mask = (k >= start) & (k <= end)
-    return k[mask], u[mask], y[mask]
-
-
 def fit_first_order(
     u: np.ndarray,
     y: np.ndarray,
     start: int | None = None,
     end: int | None = None,
-    enforce_negative_gain: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Fit a first-order discrete-time model to the data.
 
@@ -107,7 +79,6 @@ def fit_first_order(
     Parameters:
         start: The starting sample index (inclusive) to use for fitting.
         end: The ending sample index (inclusive) to use for fitting.
-        enforce_negative_gain: If True, force the input coefficient (b) to be non-positive.
 
     Returns:
         (params, k_fit, y_fit, y_pred_fit)
@@ -134,13 +105,7 @@ def fit_first_order(
 
     Phi = np.column_stack((y_k, u_k))
 
-    if enforce_negative_gain:
-        lb = [-np.inf, -np.inf]
-        ub = [np.inf, 0.0]
-        res = lsq_linear(Phi, y_k1, bounds=(lb, ub), lsmr_tol="auto")
-        theta = res.x
-    else:
-        theta, *_ = np.linalg.lstsq(Phi, y_k1, rcond=None)
+    theta, *_ = np.linalg.lstsq(Phi, y_k1, rcond=None)
 
     y_pred = np.empty_like(y_fit)
     y_pred[0] = y_fit[0]
@@ -151,7 +116,10 @@ def fit_first_order(
 
 
 def test_first_order(
-    theta: np.ndarray, u_after: np.ndarray, y_last_train: float
+    theta: np.ndarray,
+    u_after: np.ndarray,
+    y_last_train: float,
+    include_initial: bool = False,
 ) -> np.ndarray:
     """Test a first-order model by predicting forward from the end of the training interval.
 
@@ -159,9 +127,12 @@ def test_first_order(
         theta: Model parameters [a, b].
         u_after: Input values for the prediction interval (u[k] for k = k_train_end..k_test_end-1).
         y_last_train: The last measured output from the training interval.
+        include_initial: If True, include y_last_train as the first predicted point.
 
     Returns:
-        The predicted output for the test interval (y[k_train_end+1...]).
+        The predicted output for the test interval.
+        - If include_initial is False (default): returns y[k_train_end+1...].
+        - If include_initial is True: returns y[k_train_end...].
     """
 
     y_pred = np.empty(len(u_after) + 1)
@@ -169,7 +140,7 @@ def test_first_order(
     for i in range(1, len(y_pred)):
         y_pred[i] = theta[0] * y_pred[i - 1] + theta[1] * u_after[i - 1]
 
-    return y_pred[1:]
+    return y_pred if include_initial else y_pred[1:]
 
 
 def fit_second_order(
@@ -177,7 +148,6 @@ def fit_second_order(
     y: np.ndarray,
     start: int | None = None,
     end: int | None = None,
-    enforce_negative_gain: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Fit a second-order discrete-time model to the data.
 
@@ -187,7 +157,6 @@ def fit_second_order(
     Parameters:
         start: The starting sample index (inclusive) to use for fitting.
         end: The ending sample index (inclusive) to use for fitting.
-        enforce_negative_gain: If True, force the input coefficients (b1, b2) to be non-positive.
 
     Returns:
         (params, k_fit, y_fit, y_pred_fit)
@@ -216,13 +185,7 @@ def fit_second_order(
 
     Phi = np.column_stack((y_k1, y_k, u_k1, u_k))
 
-    if enforce_negative_gain:
-        lb = [-np.inf, -np.inf, -np.inf, -np.inf]
-        ub = [np.inf, np.inf, 0.0, 0.0]
-        res = lsq_linear(Phi, y_k2, bounds=(lb, ub), lsmr_tol="auto")
-        theta = res.x
-    else:
-        theta, *_ = np.linalg.lstsq(Phi, y_k2, rcond=None)
+    theta, *_ = np.linalg.lstsq(Phi, y_k2, rcond=None)
 
     y_pred = np.empty_like(y_fit)
     y_pred[0] = y_fit[0]
@@ -308,7 +271,7 @@ def main():
         print("Failed to load experiment data.")
         return
 
-    _, u, y = data
+    u, y = data
     k = np.arange(len(y))  # k is assumed to be sample index
 
     plot_data(k, u, y, "experimento.png")
@@ -327,28 +290,35 @@ def main():
     theta1, k_fit1, y_fit1, y_pred_fit1 = fit_first_order(
         u_centered, y_centered, start=train_start, end=train_end
     )
-    theta2, k_fit2, y_fit2, y_pred_fit2 = fit_second_order(
+    theta2, *_, y_pred_fit2 = fit_second_order(
         u_centered, y_centered, start=train_start, end=train_end
     )
 
     print("First-order model parameters (a, b):", theta1)
     print("Second-order model parameters (a1, a2, b1, b2):", theta2)
 
-    # Prepare the test set as everything after the training interval
-    k_test = np.arange(train_end + 1, len(y))
-    y_test = y_centered[train_end + 1 :]
+    # Prepare the test set: start from the training start and go to the end of the stream
+    k_test = np.arange(train_start, len(y))
+    y_test = y_centered[train_start:]
 
     if len(k_test) > 0:
-        # First-order: use u[train_end]..u[-2] to predict y[train_end+1]..y[-1]
-        u_after_1st = u_centered[train_end:-1]
-        y_pred_test_1 = test_first_order(theta1, u_after_1st, y_centered[train_end])
+        # First-order: predict from training start using u[train_start]..u[-2]
+        u_after_1st = u_centered[train_start:-1]
+        y_pred_test_1 = test_first_order(
+            theta1, u_after_1st, y_centered[train_start], include_initial=True
+        )
 
-        # Second-order: use u[train_end-1]..u[-2] to predict y[train_end+1]..y[-1]
-        u_after_2nd = u_centered[train_end - 1 : -1]
-        y_pred_test_2 = test_second_order(
-            theta2,
-            u_after_2nd,
-            (y_centered[train_end - 1], y_centered[train_end]),
+        # Second-order: predict from training start using u[train_start-1]..u[-2]
+        u_after_2nd = u_centered[train_start - 1 : -1]
+        y_pred_test_2 = np.concatenate(
+            (
+                [y_centered[train_start]],
+                test_second_order(
+                    theta2,
+                    u_after_2nd,
+                    (y_centered[train_start - 1], y_centered[train_start]),
+                ),
+            )
         )
     else:
         y_pred_test_1 = np.array([])
