@@ -29,7 +29,8 @@ def constroi_csv_periodos_medidos(caminho_saida, caminhos_entrada):
         periodos_medidos.append((configuracao, media, desvio))
 
     df_saida = pd.DataFrame(
-        periodos_medidos, columns=["Configuracao (ms)", "Media (ms)", "Desvio Padrao (ms)"]
+        periodos_medidos,
+        columns=["Configuracao (ms)", "Media (ms)", "Desvio Padrao (ms)"],
     )
     df_saida.to_csv(caminho_saida, index=False)
 

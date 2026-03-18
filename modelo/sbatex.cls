@@ -1,4 +1,4 @@
-% % % % % % % % % % % % % % % % % % % % % % % % 
+% % % % % % % % % % % % % % % % % % % % % % % %
 %
 % LaTeX2e class
 %
@@ -63,7 +63,7 @@
                           {1pt}
                          {\large\sffamily\bfseries\MakeUppercase}}
     \renewcommand\subsection{\@startsection{subsection}{2}
-                             {0pt} 
+                             {0pt}
                              {-6pt}
                              {1pt}
                              {\large\sffamily\bfseries}}
@@ -89,16 +89,16 @@
       \newpage
       \begin{center}%
         \hbox{\rule{\textwidth}{6pt}}
-        \vskip 1pt 
+        \vskip 1pt
         \hbox{\rule{\textwidth}{0.4pt}}
         \vskip 3mm
         {\Large\sffamily\bfseries\MakeUppercase\@title \par}%
-        \vskip 12mm 
+        \vskip 12mm
         \lineskip .5em
         {\centering{\listofauthors} \par}
         \vskip 30pt
         \hbox{\rule{\textwidth}{6pt}}
-        \vskip 1pt 
+        \vskip 1pt
         \hbox{\rule{\textwidth}{0.4pt}}
         \vskip 30pt
       \end{center}
@@ -125,7 +125,7 @@
           /bop-hook {
             newpath		    % Start a new path
             0 mm 267 mm moveto      %
-            30 mm 267 mm lineto     % 
+            30 mm 267 mm lineto     %
             180 mm 267 mm moveto    %
             210 mm 267 mm lineto    %
             0.1 setlinewidth        % set line width
@@ -168,7 +168,7 @@ Automa\c{c}\~{a}o em \today}
     }
   }
 
-  
+
   % turn on double space
   \ifthenelse{\boolean{isSubmission}}{
     \AtBeginDocument{\begin{doublespace}}
@@ -228,7 +228,7 @@ Automa\c{c}\~{a}o em \today}
 
     % paragraph with argument to make a runaway title.
     \def\namedpar#1{\paragraph{\footnotesize\bfseries #1---}}
-  
+
     % redifine abstract
     \renewenvironment{abstract}{
       \begin{center}
@@ -237,7 +237,7 @@ Automa\c{c}\~{a}o em \today}
           \namedpar{\abstractname}
     }{
         \end{minipage}
-      \end{center} 
+      \end{center}
       \vskip 1ex \par
     }
 

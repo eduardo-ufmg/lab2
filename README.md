@@ -4,6 +4,7 @@
 
 - Eduardo Henrique Basilio de Carvalho
 - João Vitor Braga da Silva Alves
+- Leticia Vitoria Martins do Carmo
 - Renan Neves da Silva
 
 ## Recursos e diretrizes
@@ -17,4 +18,4 @@
 
 ## Configuração do Ambiente
 
-Veja o [repositório pai](github.com/eduardo-ufmg/s20261/).
+Veja o [repositório pai](https://github.com/eduardo-ufmg/s20261/).

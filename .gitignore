@@ -30,13 +30,6 @@ build/
 bin/
 obj/
 
-# CMake
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-compile_commands.json
-Makefile
-
 # Autotools
 autom4te.cache/
 aclocal.m4
