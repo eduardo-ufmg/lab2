@@ -6,8 +6,10 @@ from data_io import (
     plot_predictions_poly,
     plot_predictions_ss,
 )
+from preprocess import prepare_data
 from poly_models import fit_arx, test_arx, fit_oe, test_oe
 from ss_models import fit_ss, test_ss, get_states_from_output
+from model_selection import rank_models
 
 MODELS = [
     "SS",
@@ -25,41 +27,17 @@ def main():
 
     plot_data(k, u, y, "experimento.png")
 
-    valid_start = fit_start = test_start = 1620
-    fit_end = 3500
-    valid_end = test_end = 5300
+    (
+        k_test,
+        y_test,
+        u_fit_demeaned,
+        y_fit_demeaned,
+        u_test_demeaned,
+        y_test_demeaned,
+        y_fit_mean,
+    ) = prepare_data(k, u, y)
 
-    k_valid, u_valid, y_valid = (
-        k[valid_start:valid_end],
-        u[valid_start:valid_end],
-        y[valid_start:valid_end],
-    )
-
-    plot_data(k_valid, u_valid, y_valid, "experimento_valido.png")
-
-    k_fit, u_fit, y_fit = (
-        k[fit_start:fit_end],
-        u[fit_start:fit_end],
-        y[fit_start:fit_end],
-    )
-
-    plot_data(k_fit, u_fit, y_fit, "experimento_ajuste.png")
-
-    k_test, u_test, y_test = (
-        k[test_start:test_end],
-        u[test_start:test_end],
-        y[test_start:test_end],
-    )
-
-    plot_data(k_test, u_test, y_test, "experimento_teste.png")
-
-    u_fit_mean = np.mean(u_fit)
-    y_fit_mean = np.mean(y_fit)
-
-    u_fit_demeaned = u_fit - u_fit_mean
-    y_fit_demeaned = y_fit - y_fit_mean
-    u_test_demeaned = u_test - u_fit_mean
-    y_test_demeaned = y_test - y_fit_mean
+    model_residuals = {}
 
     if "POLY" in MODELS:
         orders = [1, 2]
@@ -77,8 +55,11 @@ def main():
                 y_test_demeaned[:order],
             )
             arx_y_pred_remeaned = arx_y_pred + y_fit_mean
-            print(f"ARX({order}): MSE = {arx_mse:.6f}")
             arx_results[order] = (arx_y_pred_remeaned, arx_mse)
+            arx_residuals = y_test - arx_y_pred_remeaned
+
+            model_residuals[f"ARX({order})"] = (u_test_demeaned, arx_residuals)
+
             oe_theta = fit_oe(order, u_fit_demeaned, y_fit_demeaned)
             oe_y_pred, oe_mse = test_oe(
                 order,
@@ -88,8 +69,10 @@ def main():
                 y_test_demeaned[:order],
             )
             oe_y_pred_remeaned = oe_y_pred + y_fit_mean
-            print(f"OE({order}): MSE = {oe_mse:.6f}")
             oe_results[order] = (oe_y_pred_remeaned, oe_mse)
+            oe_residuals = y_test - oe_y_pred_remeaned
+
+            model_residuals[f"OE({order})"] = (u_test_demeaned, oe_residuals)
 
         plot_predictions_poly(
             k_test, y_test, arx_results, oe_results, "predicoes_modelos_polinomiais.png"
@@ -106,12 +89,22 @@ def main():
             nx_est, matrices_ss, u_test_demeaned, y_test_demeaned, x_init
         )
         ss_y_pred_remeaned = ss_y_pred + y_fit_mean
-        print(f"SS({nx_est}): MSE = {ss_mse:.6f}")
+        ss_residuals = y_test - ss_y_pred_remeaned
+
+        model_residuals[f"SS({nx_est})"] = (u_test_demeaned, ss_residuals)
+
         plot_predictions_ss(
             k_test,
             y_test,
             {nx_est: (ss_y_pred_remeaned, ss_mse)},
             "predicoes_modelo_ss.png",
+        )
+
+    ranking = rank_models(model_residuals)
+    print("Model Ranking:")
+    for rank, model_info in enumerate(ranking, start=1):
+        print(
+            f"{rank}. {model_info['Model']} - M_total: {model_info['M_total']:.4f} - Valid: {model_info['Valid']}"
         )
 
 
