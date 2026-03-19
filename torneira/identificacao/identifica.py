@@ -1,28 +1,35 @@
 import numpy as np
 import pandas as pd
 import matplotlib
+import scipy.linalg
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-def load_experiment_data(file_path: str) -> tuple[np.ndarray, np.ndarray] | None:
+def load_experiment_data(
+    file_path: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """Load experimental data from a CSV file.
 
     Parameters:
         file_path: Path to the CSV file.
 
     Returns:
-        (u, y) as NumPy arrays, or None on failure.
+        (k, u, y) as NumPy arrays, or None on failure.
 
-    Note: The CSV file is expected to have columns 'u' and 'y'.
+    Note: The CSV file is expected to have columns 'k', 'u' and 'y'.
     """
 
     try:
         data = pd.read_csv(file_path)
         # Strip whitespace from column headers (e.g., ' u' -> 'u')
         data.columns = data.columns.str.strip()
-        return data["u"].to_numpy(), data["y"].to_numpy()
+        return (
+            data["k"].to_numpy(dtype=float),
+            data["u"].to_numpy(dtype=float),
+            data["y"].to_numpy(dtype=float),
+        )
     except Exception as e:
         print(f"Error loading data: {e}")
         return None
@@ -65,298 +72,155 @@ def plot_data(k: np.ndarray, u: np.ndarray, y: np.ndarray, file_path: str) -> No
     plt.savefig(file_path)
 
 
-def fit_first_order(
-    u: np.ndarray,
-    y: np.ndarray,
-    start: int | None = None,
-    end: int | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Fit a first-order discrete-time model to the data.
-
-    Model:
-        y[k+1] = a * y[k] + b * u[k]
-
-    Parameters:
-        start: The starting sample index (inclusive) to use for fitting.
-        end: The ending sample index (inclusive) to use for fitting.
-
-    Returns:
-        (params, k_fit, y_fit, y_pred_fit)
-        where params = [a, b], and y_pred_fit is the model output on the fitting interval.
-        k_fit is an array of sample indices for that interval.
+def fit_arx(order: int, u_train: np.ndarray, y_train: np.ndarray) -> np.ndarray:
     """
+    Fits an ARX model using Ordinary Least Squares.
+    """
+    N = len(y_train)
+    if len(u_train) != N:
+        raise ValueError("u_train and y_train must be of equal length.")
+    if N <= order:
+        raise ValueError("Training length must exceed the auto-regressive order.")
 
-    start_idx = 0 if start is None else start
-    end_idx = len(u) - 1 if end is None else end
+    Phi = np.zeros((N - order, order + 1))
+    Y = y_train[order:]
 
-    if start_idx < 0 or end_idx < start_idx or end_idx >= len(u):
-        raise ValueError("Invalid start/end indices for fitting.")
+    for k in range(order, N):
+        Phi[k - order, :order] = -y_train[k - order : k][::-1]
+        Phi[k - order, order] = u_train[k - 1]
 
-    k_fit = np.arange(start_idx, end_idx + 1)
-    u_fit = u[start_idx : end_idx + 1]
-    y_fit = y[start_idx : end_idx + 1]
+    # scipy.linalg.lstsq uses SVD for robust OLS estimation
+    lstsq_result = scipy.linalg.lstsq(Phi, Y)
+    theta, _, _, _ = (
+        lstsq_result if lstsq_result is not None else (None, None, None, None)
+    )
 
-    if len(k_fit) < 2:
-        raise ValueError("Need at least 2 data points to fit a first-order model.")
-
-    y_k = y_fit[:-1]
-    y_k1 = y_fit[1:]
-    u_k = u_fit[:-1]
-
-    Phi = np.column_stack((y_k, u_k))
-
-    theta, *_ = np.linalg.lstsq(Phi, y_k1, rcond=None)
-
-    y_pred = np.empty_like(y_fit)
-    y_pred[0] = y_fit[0]
-    for i in range(1, len(y_fit)):
-        y_pred[i] = theta[0] * y_pred[i - 1] + theta[1] * u_fit[i - 1]
-
-    return theta, k_fit, y_fit, y_pred
+    return theta if theta is not None else np.zeros(order + 1)
 
 
-def test_first_order(
+def test_arx(
+    order: int,
     theta: np.ndarray,
-    u_after: np.ndarray,
-    y_last_train: float,
-    include_initial: bool = False,
-) -> np.ndarray:
-    """Test a first-order model by predicting forward from the end of the training interval.
-
-    Parameters:
-        theta: Model parameters [a, b].
-        u_after: Input values for the prediction interval (u[k] for k = k_train_end..k_test_end-1).
-        y_last_train: The last measured output from the training interval.
-        include_initial: If True, include y_last_train as the first predicted point.
-
-    Returns:
-        The predicted output for the test interval.
-        - If include_initial is False (default): returns y[k_train_end+1...].
-        - If include_initial is True: returns y[k_train_end...].
+    u_test: np.ndarray,
+    y_test: np.ndarray,
+    y_init: np.ndarray,
+) -> tuple[np.ndarray, float]:
     """
-
-    y_pred = np.empty(len(u_after) + 1)
-    y_pred[0] = y_last_train
-    for i in range(1, len(y_pred)):
-        y_pred[i] = theta[0] * y_pred[i - 1] + theta[1] * u_after[i - 1]
-
-    return y_pred if include_initial else y_pred[1:]
-
-
-def fit_second_order(
-    u: np.ndarray,
-    y: np.ndarray,
-    start: int | None = None,
-    end: int | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Fit a second-order discrete-time model to the data.
-
-    Model:
-        y[k+2] = a1*y[k+1] + a2*y[k] + b1*u[k+1] + b2*u[k]
-
-    Parameters:
-        start: The starting sample index (inclusive) to use for fitting.
-        end: The ending sample index (inclusive) to use for fitting.
-
-    Returns:
-        (params, k_fit, y_fit, y_pred_fit)
-        where params = [a1, a2, b1, b2], and y_pred_fit is the model output on the fitting interval.
-        k_fit is an array of sample indices for that interval.
+    Tests an ARX model using a strictly free-run simulation.
     """
+    N = len(y_test)
+    if len(u_test) != N:
+        raise ValueError("u_test and y_test must be of equal length.")
+    if len(y_init) != order:
+        raise ValueError("y_init length must strictly equal 'order'.")
 
-    start_idx = 0 if start is None else start
-    end_idx = len(u) - 1 if end is None else end
+    y_pred = np.zeros(N)
+    y_pred[:order] = y_init
 
-    if start_idx < 0 or end_idx < start_idx or end_idx >= len(u):
-        raise ValueError("Invalid start/end indices for fitting.")
+    a_params = theta[:order]
+    b_1 = theta[order]
 
-    k_fit = np.arange(start_idx, end_idx + 1)
-    u_fit = u[start_idx : end_idx + 1]
-    y_fit = y[start_idx : end_idx + 1]
+    for k in range(order, N):
+        y_pred[k] = -np.dot(a_params, y_pred[k - order : k][::-1]) + b_1 * u_test[k - 1]
 
-    if len(k_fit) < 3:
-        raise ValueError("Need at least 3 data points to fit a second-order model.")
+    mse = float(np.mean((y_test[order:] - y_pred[order:]) ** 2))
 
-    y_k = y_fit[:-2]
-    y_k1 = y_fit[1:-1]
-    y_k2 = y_fit[2:]
-    u_k = u_fit[:-2]
-    u_k1 = u_fit[1:-1]
-
-    Phi = np.column_stack((y_k1, y_k, u_k1, u_k))
-
-    theta, *_ = np.linalg.lstsq(Phi, y_k2, rcond=None)
-
-    y_pred = np.empty_like(y_fit)
-    y_pred[0] = y_fit[0]
-    y_pred[1] = y_fit[1]
-
-    for i in range(2, len(y_fit)):
-        y_pred[i] = (
-            theta[0] * y_pred[i - 1]
-            + theta[1] * y_pred[i - 2]
-            + theta[2] * u_fit[i - 1]
-            + theta[3] * u_fit[i - 2]
-        )
-
-    return theta, k_fit, y_fit, y_pred
+    return y_pred, mse
 
 
-def test_second_order(
-    theta: np.ndarray, u_after: np.ndarray, y_last_two: tuple[float, float]
-) -> np.ndarray:
-    """Test a second-order model by predicting forward from the end of the training interval.
-
-    Parameters:
-        theta: Model parameters [a1, a2, b1, b2].
-        u_after: Input values for the prediction interval.
-            Must include u[k_train_end-1] through u[k_test_end-1].
-        y_last_two: Tuple (y[k_train_end-1], y[k_train_end]).
-
-    Returns:
-        The predicted output for the test interval (y[k_train_end+1...]).
-    """
-
-    y_prev, y_last = y_last_two
-    y_pred = np.empty(len(u_after) + 1)
-    y_pred[0] = y_prev
-    y_pred[1] = y_last
-
-    for i in range(2, len(y_pred)):
-        y_pred[i] = (
-            theta[0] * y_pred[i - 1]
-            + theta[1] * y_pred[i - 2]
-            + theta[2] * u_after[i - 1]
-            + theta[3] * u_after[i - 2]
-        )
-
-    return y_pred[2:]
-
-
-def plot_model_subplots(
-    k: np.ndarray,
-    y: np.ndarray,
-    y_preds: list[np.ndarray],
-    labels: list[str],
-    title: str,
+def plot_predictions(
+    k_test: np.ndarray,
+    y_test: np.ndarray,
+    arx_results: dict[int, tuple[np.ndarray, float]],
     file_path: str,
 ) -> None:
-    """Plot measured output vs. model predictions in stacked subplots.
+    """
+    Plots the true output signal and ARX model predictions.
 
-    Each prediction is plotted as a separate subplot, one below the other.
+    Parameters:
+    k_test (np.ndarray): The time steps for the test data.
+    y_test (np.ndarray): The true output signal values for the test data.
+    arx_results (dict[int, tuple[np.ndarray, float]]): A dictionary where keys are ARX orders and values are tuples of (predicted output, MSE).
+    file_path (str): The path where the plot will be saved.
+
+    This function creates a plot comparing the true output signal with the predictions from different ARX models in a 1x2 layout.
     """
 
-    n = len(y_preds)
-    plt.figure(figsize=(8, 3 * n))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    for i, (y_pred, label) in enumerate(zip(y_preds, labels), start=1):
-        ax = plt.subplot(n, 1, i)
-        ax.plot(k, y, label="Measured Output")
-        ax.plot(k, y_pred, label=label, linestyle="--")
-        ax.set_title(f"{title} — {label}")
-        ax.set_xlabel("Time Steps (k)")
-        ax.set_ylabel("Temperature Sensor Voltage (V)")
-        ax.grid()
-        ax.legend()
+    for idx, (order, (y_pred, mse)) in enumerate(arx_results.items()):
+        axes[idx].plot(k_test, y_test, label="True Output", color="black", linewidth=2)
+        axes[idx].plot(k_test, y_pred, label=f"ARX({order}) Prediction (MSE={mse:.6f})")
+        axes[idx].set_title(f"ARX({order}) Model Prediction vs True Output")
+        axes[idx].set_xlabel("Time Steps (k)")
+        axes[idx].set_ylabel("Output Voltage (V)")
+        axes[idx].grid()
+        axes[idx].legend()
 
     plt.tight_layout()
     plt.savefig(file_path)
 
 
 def main():
-    file_path = "experimento.txt"
-    data = load_experiment_data(file_path)
-
-    if data is None:
-        print("Failed to load experiment data.")
+    data = load_experiment_data("experimento.txt")
+    if data is not None:
+        k, u, y = data
+    else:
+        print("Failed to load data. Please check the file path and format.")
         return
-
-    u, y = data
-    k = np.arange(len(y))  # k is assumed to be sample index
 
     plot_data(k, u, y, "experimento.png")
 
-    train_start = 1700
-    train_end = 3500
+    valid_start = fit_start = test_start = 1620
+    fit_end = 3500
+    valid_end = test_end = 5300
 
-    # Center the data using the training interval (to improve numeric conditioning).
-    u_offset = u[train_start : train_end + 1].mean()
-    y_offset = y[train_start : train_end + 1].mean()
-
-    u_centered = u - u_offset
-    y_centered = y - y_offset
-
-    # Fit models on the training interval (inclusive)
-    theta1, k_fit1, y_fit1, y_pred_fit1 = fit_first_order(
-        u_centered, y_centered, start=train_start, end=train_end
-    )
-    theta2, *_, y_pred_fit2 = fit_second_order(
-        u_centered, y_centered, start=train_start, end=train_end
+    k_valid, u_valid, y_valid = (
+        k[valid_start:valid_end],
+        u[valid_start:valid_end],
+        y[valid_start:valid_end],
     )
 
-    print("First-order model parameters (a, b):", theta1)
-    print("Second-order model parameters (a1, a2, b1, b2):", theta2)
+    plot_data(k_valid, u_valid, y_valid, "experimento_valido.png")
 
-    # Prepare the test set: start from the training start and go to the end of the stream
-    k_test = np.arange(train_start, len(y))
-    y_test = y_centered[train_start:]
+    k_fit, u_fit, y_fit = (
+        k[fit_start:fit_end],
+        u[fit_start:fit_end],
+        y[fit_start:fit_end],
+    )
 
-    if len(k_test) > 0:
-        # First-order: predict from training start using u[train_start]..u[-2]
-        u_after_1st = u_centered[train_start:-1]
-        y_pred_test_1 = test_first_order(
-            theta1, u_after_1st, y_centered[train_start], include_initial=True
+    plot_data(k_fit, u_fit, y_fit, "experimento_ajuste.png")
+
+    k_test, u_test, y_test = (
+        k[test_start:test_end],
+        u[test_start:test_end],
+        y[test_start:test_end],
+    )
+
+    plot_data(k_test, u_test, y_test, "experimento_teste.png")
+
+    u_fit_mean = np.mean(u_fit)
+    y_fit_mean = np.mean(y_fit)
+
+    u_fit_demeaned = u_fit - u_fit_mean
+    y_fit_demeaned = y_fit - y_fit_mean
+    u_test_demeaned = u_test - u_fit_mean
+    y_test_demeaned = y_test - y_fit_mean
+
+    orders = [1, 2]
+
+    arx_results = {}
+
+    for order in orders:
+        theta = fit_arx(order, u_fit_demeaned, y_fit_demeaned)
+        y_pred, mse = test_arx(
+            order, theta, u_test_demeaned, y_test_demeaned, y_fit_demeaned[:order]
         )
+        y_pred_remeaned = y_pred + y_fit_mean
+        print(f"ARX({order}): MSE = {mse:.6f}")
+        arx_results[order] = (y_pred_remeaned, mse)
 
-        # Second-order: predict from training start using u[train_start-1]..u[-2]
-        u_after_2nd = u_centered[train_start - 1 : -1]
-        y_pred_test_2 = np.concatenate(
-            (
-                [y_centered[train_start]],
-                test_second_order(
-                    theta2,
-                    u_after_2nd,
-                    (y_centered[train_start - 1], y_centered[train_start]),
-                ),
-            )
-        )
-    else:
-        y_pred_test_1 = np.array([])
-        y_pred_test_2 = np.array([])
-
-    # Re-add offsets for plotting
-    y_fit1_plot = y_fit1 + y_offset
-    y_pred_fit1_plot = y_pred_fit1 + y_offset
-    y_test_plot = y_test + y_offset
-    y_pred_test_1_plot = y_pred_test_1 + y_offset
-    y_pred_test_2_plot = y_pred_test_2 + y_offset
-
-    plot_data(
-        k_fit1,
-        u[train_start : train_end + 1],
-        y_fit1_plot,
-        "experimento_sem_transiente.png",
-    )
-
-    # Save a single figure for train fit with the two models as stacked subplots.
-    plot_model_subplots(
-        k_fit1,
-        y_fit1_plot,
-        [y_pred_fit1_plot, y_pred_fit2 + y_offset],
-        ["1st Order Model (train)", "2nd Order Model (train)"],
-        "Training fit",
-        "fit_train.png",
-    )
-
-    if len(k_test) > 0:
-        plot_model_subplots(
-            k_test,
-            y_test_plot,
-            [y_pred_test_1_plot, y_pred_test_2_plot],
-            ["1st Order Model (test)", "2nd Order Model (test)"],
-            "Test prediction",
-            "fit_test.png",
-        )
+    plot_predictions(k_test, y_test, arx_results, "predicoes_arx.png")
 
 
 if __name__ == "__main__":
