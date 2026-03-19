@@ -4,3 +4,4 @@ pandas
 matplotlib
 pre-commit
 black
+sippy_unipi

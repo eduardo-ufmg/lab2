@@ -71,7 +71,7 @@ def plot_data(k: np.ndarray, u: np.ndarray, y: np.ndarray, file_path: str) -> No
     plt.savefig(file_path)
 
 
-def plot_predictions(
+def plot_predictions_poly(
     k_test: np.ndarray,
     y_test: np.ndarray,
     arx_results: dict[int, tuple[np.ndarray, float]],
@@ -121,5 +121,46 @@ def plot_predictions(
         axes[1, idx].grid()
         axes[1, idx].legend()
 
+    plt.tight_layout()
+    plt.savefig(file_path)
+
+
+def plot_predictions_ss(
+    k_test: np.ndarray,
+    y_test: np.ndarray,
+    ss_results: dict[int, tuple[np.ndarray, float]],
+    file_path: str,
+) -> None:
+    """
+    Plots the true output signal and state-space model predictions.
+
+    Parameters:
+    k_test (np.ndarray): The time steps for the test data.
+    y_test (np.ndarray): The true output signal values for the test data.
+    ss_results (dict[int, tuple[np.ndarray, float]]): A dictionary where keys are state-space model orders and values are tuples of (predicted output, MSE).
+    file_path (str): The path where the plot will be saved.
+
+    This function creates a plot comparing the true output signal with the predictions from different state-space models in a single figure.
+    """
+
+    plt.figure(figsize=(10, 6))
+
+    # Plot true output
+    plt.plot(k_test, y_test, label="True Output", color="black", linewidth=2)
+
+    # Plot state-space model predictions
+    for order, (y_pred, mse) in ss_results.items():
+        plt.plot(
+            k_test,
+            y_pred,
+            label=f"SS({order}) Prediction (MSE={mse:.6f})",
+            linewidth=1.5,
+        )
+
+    plt.title("State-Space Model Predictions vs True Output")
+    plt.xlabel("Time Steps (k)")
+    plt.ylabel("Output Voltage (V)")
+    plt.grid()
+    plt.legend()
     plt.tight_layout()
     plt.savefig(file_path)
