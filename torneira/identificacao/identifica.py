@@ -9,7 +9,6 @@ from data_io import (
 from preprocess import prepare_data
 from poly_models import fit_arx, test_arx, fit_oe, test_oe
 from ss_models import fit_ss, test_ss, get_states_from_output
-from model_selection import rank_models
 
 MODELS = [
     "SS",
@@ -37,8 +36,6 @@ def main():
         y_fit_mean,
     ) = prepare_data(k, u, y)
 
-    model_residuals = {}
-
     if "POLY" in MODELS:
         orders = [1, 2]
 
@@ -56,9 +53,6 @@ def main():
             )
             arx_y_pred_remeaned = arx_y_pred + y_fit_mean
             arx_results[order] = (arx_y_pred_remeaned, arx_mse)
-            arx_residuals = y_test - arx_y_pred_remeaned
-
-            model_residuals[f"ARX({order})"] = (u_test_demeaned, arx_residuals)
 
             oe_theta = fit_oe(order, u_fit_demeaned, y_fit_demeaned)
             oe_y_pred, oe_mse = test_oe(
@@ -70,13 +64,16 @@ def main():
             )
             oe_y_pred_remeaned = oe_y_pred + y_fit_mean
             oe_results[order] = (oe_y_pred_remeaned, oe_mse)
-            oe_residuals = y_test - oe_y_pred_remeaned
-
-            model_residuals[f"OE({order})"] = (u_test_demeaned, oe_residuals)
 
         plot_predictions_poly(
             k_test, y_test, arx_results, oe_results, "predicoes_modelos_polinomiais.png"
         )
+
+        for order, (_, mse) in arx_results.items():
+            print(f"ARX({order}) MSE: {mse:.4f}")
+
+        for order, (_, mse) in oe_results.items():
+            print(f"OE({order}) MSE: {mse:.4f}")
 
     if "SS" in MODELS:
         matrices_ss = fit_ss(2, u_fit_demeaned, y_fit_demeaned)
@@ -89,9 +86,6 @@ def main():
             nx_est, matrices_ss, u_test_demeaned, y_test_demeaned, x_init
         )
         ss_y_pred_remeaned = ss_y_pred + y_fit_mean
-        ss_residuals = y_test - ss_y_pred_remeaned
-
-        model_residuals[f"SS({nx_est})"] = (u_test_demeaned, ss_residuals)
 
         plot_predictions_ss(
             k_test,
@@ -100,12 +94,7 @@ def main():
             "predicoes_modelo_ss.png",
         )
 
-    ranking = rank_models(model_residuals)
-    print("Model Ranking:")
-    for rank, model_info in enumerate(ranking, start=1):
-        print(
-            f"{rank}. {model_info['Model']} - M_total: {model_info['M_total']:.4f} - Valid: {model_info['Valid']}"
-        )
+        print(f"SS({nx_est}) MSE: {ss_mse:.4f}")
 
 
 if __name__ == "__main__":
