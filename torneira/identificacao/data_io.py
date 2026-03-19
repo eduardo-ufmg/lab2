@@ -146,16 +146,11 @@ def plot_predictions_ss(
     plt.figure(figsize=(10, 6))
 
     # Plot true output
-    plt.plot(k_test, y_test, label="True Output", color="black", linewidth=2)
+    plt.plot(k_test, y_test, label="True Output", color="black")
 
     # Plot state-space model predictions
     for order, (y_pred, mse) in ss_results.items():
-        plt.plot(
-            k_test,
-            y_pred,
-            label=f"SS({order}) Prediction (MSE={mse:.6f})",
-            linewidth=1.5,
-        )
+        plt.plot(k_test, y_pred, label=f"SS({order}) Prediction (MSE={mse:.6f})")
 
     plt.title("State-Space Model Predictions vs True Output")
     plt.xlabel("Time Steps (k)")

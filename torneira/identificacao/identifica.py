@@ -26,6 +26,18 @@ def main():
 
     plot_data(k, u, y, "experimento.png")
 
+    delay_inspection_bounds = (1780, 1880)
+    k_delay_inspection = k[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
+    u_delay_inspection = u[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
+    y_delay_inspection = y[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
+
+    plot_data(
+        k_delay_inspection,
+        u_delay_inspection,
+        y_delay_inspection,
+        "inspecao_atraso.png",
+    )
+
     (
         k_test,
         y_test,
@@ -36,6 +48,8 @@ def main():
         y_fit_mean,
     ) = prepare_data(k, u, y)
 
+    delay = 25
+
     if "POLY" in MODELS:
         orders = [1, 2]
 
@@ -43,24 +57,29 @@ def main():
         oe_results = {}
 
         for order in orders:
-            arx_theta = fit_arx(order, u_fit_demeaned, y_fit_demeaned)
+
+            y_init = y_test_demeaned[: max(order, delay)]
+
+            arx_theta = fit_arx(order, delay, u_fit_demeaned, y_fit_demeaned)
             arx_y_pred, arx_mse = test_arx(
                 order,
+                delay,
                 arx_theta,
                 u_test_demeaned,
                 y_test_demeaned,
-                y_test_demeaned[:order],
+                y_init,
             )
             arx_y_pred_remeaned = arx_y_pred + y_fit_mean
             arx_results[order] = (arx_y_pred_remeaned, arx_mse)
 
-            oe_theta = fit_oe(order, u_fit_demeaned, y_fit_demeaned)
+            oe_theta = fit_oe(order, delay, u_fit_demeaned, y_fit_demeaned)
             oe_y_pred, oe_mse = test_oe(
                 order,
+                delay,
                 oe_theta,
                 u_test_demeaned,
                 y_test_demeaned,
-                y_test_demeaned[:order],
+                y_init,
             )
             oe_y_pred_remeaned = oe_y_pred + y_fit_mean
             oe_results[order] = (oe_y_pred_remeaned, oe_mse)
@@ -76,14 +95,14 @@ def main():
             print(f"OE({order}) MSE: {mse:.4f}")
 
     if "SS" in MODELS:
-        matrices_ss = fit_ss(2, u_fit_demeaned, y_fit_demeaned)
+        matrices_ss = fit_ss(2, delay, u_fit_demeaned, y_fit_demeaned)
         nx_est = matrices_ss[0].shape[0]
 
         # Estimate initial state from the first test output sample.
         x_init = get_states_from_output(matrices_ss[2], y_test_demeaned[0])
 
         ss_y_pred, ss_mse = test_ss(
-            nx_est, matrices_ss, u_test_demeaned, y_test_demeaned, x_init
+            nx_est, delay, matrices_ss, u_test_demeaned, y_test_demeaned, x_init
         )
         ss_y_pred_remeaned = ss_y_pred + y_fit_mean
 
