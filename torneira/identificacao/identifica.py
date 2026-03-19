@@ -48,7 +48,8 @@ def main():
         y_fit_mean,
     ) = prepare_data(k, u, y)
 
-    delay = 25
+    delay_firstorder = 25
+    delay_secondorder = 10
 
     if "POLY" in MODELS:
         orders = [1, 2]
@@ -56,14 +57,19 @@ def main():
         arx_results = {}
         oe_results = {}
 
+        delays = {
+            1: delay_firstorder,
+            2: delay_secondorder,
+        }
+
         for order in orders:
 
-            y_init = y_test_demeaned[: max(order, delay)]
+            y_init = y_test_demeaned[: max(order, delays[order])]
 
-            arx_theta = fit_arx(order, delay, u_fit_demeaned, y_fit_demeaned)
+            arx_theta = fit_arx(order, delays[order], u_fit_demeaned, y_fit_demeaned)
             arx_y_pred, arx_mse = test_arx(
                 order,
-                delay,
+                delays[order],
                 arx_theta,
                 u_test_demeaned,
                 y_test_demeaned,
@@ -72,10 +78,10 @@ def main():
             arx_y_pred_remeaned = arx_y_pred + y_fit_mean
             arx_results[order] = (arx_y_pred_remeaned, arx_mse)
 
-            oe_theta = fit_oe(order, delay, u_fit_demeaned, y_fit_demeaned)
+            oe_theta = fit_oe(order, delays[order], u_fit_demeaned, y_fit_demeaned)
             oe_y_pred, oe_mse = test_oe(
                 order,
-                delay,
+                delays[order],
                 oe_theta,
                 u_test_demeaned,
                 y_test_demeaned,
@@ -95,14 +101,19 @@ def main():
             print(f"OE({order}) MSE: {mse:.4f}")
 
     if "SS" in MODELS:
-        matrices_ss = fit_ss(2, delay, u_fit_demeaned, y_fit_demeaned)
+        matrices_ss = fit_ss(2, delay_firstorder, u_fit_demeaned, y_fit_demeaned)
         nx_est = matrices_ss[0].shape[0]
 
         # Estimate initial state from the first test output sample.
         x_init = get_states_from_output(matrices_ss[2], y_test_demeaned[0])
 
         ss_y_pred, ss_mse = test_ss(
-            nx_est, delay, matrices_ss, u_test_demeaned, y_test_demeaned, x_init
+            nx_est,
+            delay_firstorder,
+            matrices_ss,
+            u_test_demeaned,
+            y_test_demeaned,
+            x_init,
         )
         ss_y_pred_remeaned = ss_y_pred + y_fit_mean
 
