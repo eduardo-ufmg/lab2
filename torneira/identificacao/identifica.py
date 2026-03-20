@@ -6,17 +6,16 @@ from data_io import (
     plot_predictions_poly,
     plot_ss,
     plot_predictions_poly_gb,
+    plot_tf_times,
+    plot_tf_predictions,
 )
 from preprocess import prepare_data
 from poly_models import fit_arx, test_arx, fit_oe, test_oe
 from ss_models import fit_ss, test_ss, get_states_from_output
-from greybox_fit import fit_arx_graybox, fit_oe_graybox, fit_ss_graybox
+from greybox_models import fit_arx_graybox, fit_oe_graybox, fit_ss_graybox
+from tf_model import fit_tf, test_tf
 
-MODELS = [
-    "SS",
-    "POLY",
-    "GREYBOX",
-]  # Set to ["SS"] to test only state-space model, ["POLY"] for polynomial models, ["GREYBOX"] for grey-box models, or any combination of these.
+MODELS = ["TF"]
 
 
 def main():
@@ -29,20 +28,12 @@ def main():
 
     plot_data(k, u, y, "experimento.png")
 
-    delay_inspection_bounds = (1780, 1880)
-    k_delay_inspection = k[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
-    u_delay_inspection = u[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
-    y_delay_inspection = y[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
-
-    plot_data(
-        k_delay_inspection,
-        u_delay_inspection,
-        y_delay_inspection,
-        "inspecao_atraso.png",
-    )
-
     (
+        k_fit,
+        u_fit,
+        y_fit,
         k_test,
+        u_test,
         y_test,
         u_fit_demeaned,
         y_fit_demeaned,
@@ -189,6 +180,27 @@ def main():
             {nx_gb_est: (ss_gb_y_pred_remeaned, ss_gb_mse)},
             {nx_gb_est: ss_gb_states},
             "predicoes_modelo_ss_greybox.png",
+        )
+
+    if "TF" in MODELS:
+        K_tf, tau_tf, L_tf, step_idx = fit_tf(k_fit, u_fit, y_fit, Ts=0.1)
+        print(f"FOPDT Parameters: K={K_tf:.4f}, tau={tau_tf:.4f}, L={L_tf:.4f}")
+
+        plot_tf_times(
+            k_fit,
+            u_fit,
+            y_fit,
+            tau_tf,
+            L_tf,
+            Ts=0.1,
+            step_idx=step_idx,
+            file_path="tempos_modelo_tf.png",
+        )
+
+        tf_y_pred, tf_mse = test_tf(K_tf, tau_tf, L_tf, u_test, y_test, Ts=0.1)
+
+        plot_tf_predictions(
+            k_test, y_test, (tf_y_pred, tf_mse), "predicoes_modelo_tf.png"
         )
 
 

@@ -98,3 +98,58 @@ def test_ss(
 
     # Return state trajectory excluding the initial state at k=0 so state sequence aligns with y_pred timestamps
     return y_pred, mse, x[:, 1:]
+
+
+def test_tf(
+    K: float, tau: float, L: float, u_test: np.ndarray, y_test: np.ndarray, Ts: float
+) -> tuple[np.ndarray, float]:
+    """
+    Evaluates an FOPDT model on a validation dataset using a Zero-Order Hold (ZOH)
+    discrete-time difference equation.
+
+    Args:
+        K: Process gain.
+        tau: Time constant (seconds).
+        L: Dead time (seconds).
+        u_test: Input vector (absolute values).
+        y_test: Measured output vector (absolute values, for MSE calculation).
+        Ts: Sampling period in seconds.
+
+    Returns:
+        y_pred: Predicted output vector (absolute values).
+        mse: Mean Squared Error.
+    """
+    N = len(y_test)
+    if len(u_test) != N:
+        raise ValueError("Arrays u_test and y_test must have equal lengths.")
+
+    # 1. ZOH Discretization Parameters
+    a = np.exp(-Ts / tau)
+    b = K * (1.0 - a)
+
+    # Convert continuous dead time to discrete sample delay
+    nk = int(np.round(L / Ts))
+
+    # 2. Establish Equilibrium Operating Points
+    u_0 = u_test[0]
+    y_0 = y_test[0]
+
+    # Convert absolute inputs to deviation variables
+    u_dev = u_test - u_0
+    y_pred_dev = np.zeros(N)
+
+    # 3. Simulate Difference Equation
+    for k in range(1, N):
+        # Apply transport delay (+1 inherent sample delay from strictly proper ZOH)
+        u_idx = k - 1 - nk
+
+        # Clamp unmeasured past inputs to the initial steady-state deviation (0.0)
+        u_val = u_dev[u_idx] if u_idx >= 0 else 0.0
+
+        y_pred_dev[k] = a * y_pred_dev[k - 1] + b * u_val
+
+    # 4. Reconstruct Absolute Output and Compute Metric
+    y_pred = y_pred_dev + y_0
+    mse = float(np.mean((y_test - y_pred) ** 2))
+
+    return y_pred, mse

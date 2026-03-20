@@ -12,11 +12,11 @@ def fit_arx_graybox(
 
     Returns:
         theta: Estimated parameter array [a1, a2, b1, b2].
-        order: The hardcoded auto-regressive order (2).
-        NK: The hardcoded transport delay (1).
+        order: The hardcoded auto-regressive order.
+        NK: The hardcoded transport delay.
     """
     order = 2
-    NK = 1
+    NK = 2
 
     N = len(y_train)
     start_idx = max(order, NK + 1)
@@ -42,15 +42,15 @@ def fit_oe_graybox(
     u_train: np.ndarray, y_train: np.ndarray
 ) -> tuple[np.ndarray, int, int]:
     """
-    Fits a 2nd-order Output Error model with a discrete zero via nonlinear optimization.
+    Fits a 1st-order Output Error model with a discrete zero via nonlinear optimization.
 
     Returns:
         theta: Optimized parameter array [f1, f2, b1, b2].
-        order: The hardcoded auto-regressive order (2).
-        NK: The hardcoded transport delay (1).
+        order: The hardcoded auto-regressive order.
+        NK: The hardcoded transport delay.
     """
-    order = 2
-    NK = 1
+    order = 1
+    NK = 20
 
     N = len(y_train)
     start_idx = max(order, NK + 1)

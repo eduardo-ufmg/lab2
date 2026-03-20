@@ -256,3 +256,96 @@ def plot_ss(
     ax2.set_xlabel("Time Steps (k)")
     fig.tight_layout()
     fig.savefig(file_path)
+
+
+def plot_tf_times(
+    k: np.ndarray,
+    u: np.ndarray,
+    y: np.ndarray,
+    tau: float,
+    L: float,
+    Ts: float,
+    step_idx: int,
+    file_path: str,
+) -> None:
+    """
+    Plot the training signals and key TF timing points for FOPDT model interpretation.
+
+    Parameters:
+    k: sample indices (samples).
+    u: input signal values.
+    y: output signal values.
+    tau: estimated time constant (seconds).
+    L: estimated dead time (seconds).
+    Ts: sampling period (seconds).
+    step_idx: detected step index from tf_model.fit_tf.
+    file_path: path where the figure is saved.
+
+    The plot includes:
+    - experimental input and output trajectories vs real time (k*Ts)
+    - vertical line at step_idx
+    - vertical line at step_idx + L (dead time end)
+    - vertical line at step_idx + L + tau (time constant marker)
+    """
+
+    # Convert dead time and time constant from seconds to sample indices
+    L_idx = int(np.round(L / Ts))
+    tau_idx = int(np.round(tau / Ts))
+
+    # Plot using raw index values (k axis)
+    step_idx = int(step_idx) + k[0]  # Adjust step_idx to align with k's actual values
+    dead_idx = step_idx + L_idx
+    tau_idx_point = dead_idx + tau_idx
+
+    fig, ax = plt.subplots()
+    ax.plot(k, y - y[0], label="y", color="tab:orange")
+
+    ax.axvline(step_idx, color="tab:green", label="step index")
+    ax.axvline(dead_idx, color="tab:red", label="step+L index")
+    ax.axvline(tau_idx_point, color="tab:purple", label="step+L+tau index")
+
+    ax.set_title("FOPDT Model Timing: Step, Dead Time, and Time Constant")
+    ax.set_xlabel("Sample index")
+    ax.set_ylabel("Signal - offset V")
+    ax.grid()
+    ax.legend(loc="best")
+
+    fig.tight_layout()
+    fig.savefig(file_path)
+
+
+def plot_tf_predictions(
+    k_test: np.ndarray,
+    y_test: np.ndarray,
+    tf_result: tuple[np.ndarray, float],
+    file_path: str,
+) -> None:
+    """
+    Plots the true output signal and FOPDT model predictions.
+
+    Parameters:
+    k_test (np.ndarray): The time steps for the test data.
+    y_test (np.ndarray): The true output signal values for the test data.
+    tf_result (tuple[np.ndarray, float]): FOPDT prediction and MSE, shape (y_pred, mse).
+    file_path (str): The path where the plot will be saved.
+
+    This function creates a plot comparing the true output signal with the predictions from the FOPDT model.
+    """
+
+    tf_pred, tf_mse = tf_result
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(k_test, y_test, label="True Output", color="black", linewidth=2)
+    plt.plot(
+        k_test,
+        tf_pred,
+        label=f"FOPDT Prediction (MSE={tf_mse:.6f})",
+        alpha=0.8,
+    )
+    plt.title("FOPDT Model Prediction vs True Output")
+    plt.xlabel("Time Steps (k)")
+    plt.ylabel("Output Voltage (V)")
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(file_path)

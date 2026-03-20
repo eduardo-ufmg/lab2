@@ -3,10 +3,18 @@ import numpy as np
 from data_io import plot_data
 
 
-def prepare_data(
-    k: np.ndarray, u: np.ndarray, y: np.ndarray
-) -> tuple[
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float
+def prepare_data(k: np.ndarray, u: np.ndarray, y: np.ndarray) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    float,
 ]:
     """
     Prepares the dataset by splitting it into fitting, validation, and testing subsets.
@@ -17,6 +25,7 @@ def prepare_data(
     valid_start = fit_start = test_start = 1620
     fit_end = 3500
     valid_end = test_end = 5300
+    delay_inspection_bounds = (1780, 1880)
 
     k_valid, u_valid, y_valid = (
         k[valid_start:valid_end],
@@ -25,6 +34,17 @@ def prepare_data(
     )
 
     plot_data(k_valid, u_valid, y_valid, "experimento_valido.png")
+
+    k_delay_inspection = k[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
+    u_delay_inspection = u[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
+    y_delay_inspection = y[delay_inspection_bounds[0] : delay_inspection_bounds[1]]
+
+    plot_data(
+        k_delay_inspection,
+        u_delay_inspection,
+        y_delay_inspection,
+        "inspecao_atraso.png",
+    )
 
     k_fit, u_fit, y_fit = (
         k[fit_start:fit_end],
@@ -51,7 +71,11 @@ def prepare_data(
     y_test_demeaned = y_test - y_fit_mean
 
     return (
+        k_fit,
+        u_fit,
+        y_fit,
         k_test,
+        u_test,
         y_test,
         u_fit_demeaned,
         y_fit_demeaned,
