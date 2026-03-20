@@ -98,11 +98,11 @@ def fit_ss_graybox(
     u_train: np.ndarray, y_train: np.ndarray
 ) -> tuple[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], int, int]:
     """
-    Identifies a strictly 2nd-order state-space model and applies a similarity
-    transformation to decouple the fast (water) and slow (sensor) dynamics.
+    Identifies a strictly 2nd-order state-space model, decouples the fast and slow
+    dynamics, and enforces a positive internal heat transfer sign convention.
 
     Returns:
-        A_cas, B_cas, C_cas, D_cas: Matrices in the physical cascade canonical form.
+        A_phys, B_phys, C_phys, K: Matrices in the corrected physical cascade canonical form.
         nx: The hardcoded state dimension (2).
         NK: The hardcoded transport delay (1).
     """
@@ -136,26 +136,26 @@ def fit_ss_graybox(
 
     # Map to modal output matrix
     C_diag = C_id @ V_sorted
-
-    if C_diag.shape[1] < 2:
-        raise ValueError(
-            "fit_ss_graybox requires a 2nd-order system with two modal contributions "
-            f"(C_diag shape={C_diag.shape}); check training data or model order."
-        )
-
     c_f = C_diag[0, 0]
     c_s = C_diag[0, 1]
 
-    # Construct the physical mapping matrix M
+    # Construct the abstract mapping matrix M
     M = np.array([[c_f, 0], [c_f, c_s]])
 
     # Compute the global similarity transformation T = V * M^-1
     T = V_sorted @ np.linalg.inv(M)
     T_inv = np.linalg.inv(T)
 
-    # Apply similarity transformation to yield the cascade canonical form
+    # Apply similarity transformation to yield the abstract cascade canonical form
     A_cas = np.real(T_inv @ A_id @ T)
     B_cas = np.real(T_inv @ B_id)
     C_cas = np.real(C_id @ T)
 
-    return (A_cas, B_cas, C_cas, np.zeros((nx, nx))), nx, NK
+    # Apply reflection to correct the physical sign convention
+    T_ref = np.array([[-1.0, 0.0], [0.0, 1.0]])
+
+    A_phys = T_ref @ A_cas @ T_ref
+    B_phys = T_ref @ B_cas
+    C_phys = C_cas @ T_ref
+
+    return (A_phys, B_phys, C_phys, np.zeros((nx, nx))), nx, NK
