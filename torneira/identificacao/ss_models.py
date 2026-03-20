@@ -63,7 +63,7 @@ def test_ss(
     u_test: np.ndarray,
     y_test: np.ndarray,
     x_init: np.ndarray,
-) -> tuple[np.ndarray, float]:
+) -> tuple[np.ndarray, float, np.ndarray]:
     """
     Evaluates the deterministic state-space model using a free-run simulation.
     Applies the explicit transport delay step mathematically into the state transition.
@@ -96,4 +96,5 @@ def test_ss(
 
     mse = float(np.mean((y_test - y_pred) ** 2))
 
-    return y_pred, mse
+    # Return state trajectory excluding the initial state at k=0 so state sequence aligns with y_pred timestamps
+    return y_pred, mse, x[:, 1:]
