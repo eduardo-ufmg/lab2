@@ -16,6 +16,7 @@ from greybox_models import fit_arx_graybox, fit_oe_graybox, fit_ss_graybox
 from tf_model import fit_tf, test_tf
 
 MODELS = ["TF"]
+Ts = 0.1
 
 
 def main():
@@ -183,7 +184,7 @@ def main():
         )
 
     if "TF" in MODELS:
-        K_tf, tau_tf, L_tf, step_idx = fit_tf(k_fit, u_fit, y_fit, Ts=0.1)
+        K_tf, tau_tf, L_tf, step_idx = fit_tf(k_fit, u_fit, y_fit, Ts=Ts)
         print(f"FOPDT Parameters: K={K_tf:.4f}, tau={tau_tf:.4f}, L={L_tf:.4f}")
 
         plot_tf_times(
@@ -192,15 +193,35 @@ def main():
             y_fit,
             tau_tf,
             L_tf,
-            Ts=0.1,
+            Ts=Ts,
             step_idx=step_idx,
             file_path="tempos_modelo_tf.png",
         )
 
-        tf_y_pred, tf_mse = test_tf(K_tf, tau_tf, L_tf, u_test, y_test, Ts=0.1)
+        tf_y_pred, tf_mse = test_tf(K_tf, tau_tf, L_tf, u_test, y_test, Ts=Ts)
 
         plot_tf_predictions(
             k_test, y_test, (tf_y_pred, tf_mse), "predicoes_modelo_tf.png"
+        )
+
+        test_minus_fit_time = (
+            3600 - 1620
+        )  # Testa apenas a parte do teste, ignorando o ajuste
+
+        tf_y_pred_test, tf_mse_test = test_tf(
+            K_tf,
+            tau_tf,
+            L_tf,
+            u_test[test_minus_fit_time:],
+            y_test[test_minus_fit_time:],
+            Ts=Ts,
+        )
+
+        plot_tf_predictions(
+            k_test[test_minus_fit_time:],
+            y_test[test_minus_fit_time:],
+            (tf_y_pred_test, tf_mse_test),
+            "predicoes_modelo_tf_teste.png",
         )
 
 

@@ -2,6 +2,8 @@
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
 
 \begin{document}
 
@@ -47,7 +49,7 @@ Para caracterizar a confiabilidade temporal do kernel de tempo real, o seguinte 
 
 Pela limitação de recursos computacionais, o número de amostras $N$ foi definido como $N = 1000$ para $P_\text{configurado} = 1,\ 10\, \text{ms}$ e $N = 100$ para $P_\text{configurado} = 100\,\text{ms}$.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
     \begin{tabular}{r r r}
         \hline
@@ -63,6 +65,75 @@ Pela limitação de recursos computacionais, o número de amostras $N$ foi defin
 \end{table}
 
 A tabela \ref{tab:resultados_temporais} apresenta os resultados dos experimentos de caracterização temporal do kernel de tempo real. Observa-se que a média dos períodos medidos $\bar{P}$ é, nos algarismo significativos considerados, igual ao período configurado $P_\text{configurado}$ para todas as configurações testadas. O desvio padrão $\sigma_P$ é relativamente baixo, indicando que os períodos medidos estão próximos da média, o que sugere um comportamento temporal consistente do kernel de tempo real sob as condições do experimento.
+
+\section{Coleta dos Dados}
+
+O experimento consiste em um par de degraus, separados por tempo o suficiente para que o sistema atinja um estado estacionário, e com direções opostas. O período de amostragem selecionado é de $100 ms$. Sob este, o primeiro degrau, de $8 V$ para $2 V$, é aplicado na amostra $k = 1800$, e o segundo degrau, de $2 V$ para $8 V$, é aplicado na amostra $k = 3600$. O experimento é conduzido por um total de $N = 5400$ amostras, o que corresponde a um tempo total de aquisição de $540 s$.
+
+As curvas levantadas são apresentadas na figura \ref{fig:experimento}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../identificacao/experimento.png}
+    \caption{Curvas de resposta do sistema à aplicação dos degraus.}
+    \label{fig:experimento}
+\end{figure}
+
+A visualização das curvas expõe a presença de ruído e de fortes pertubações pontuais. Para a continuídade da análise, as primeiras 1620 amostras são descartadas. As curvas resultantes são apresentadas na figura \ref{fig:experimento_valido}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../identificacao/experimento_valido.png}
+    \caption{Curvas de resposta do sistema à aplicação dos degraus, após descarte das amostras iniciais.}
+    \label{fig:experimento_valido}
+\end{figure}
+
+\section{Identificação do Sistema}
+
+Dada a baixa persistencia de excitação dinâmica, percebida nos longos intervalos em que o sistema fica próximo do estado estacionário, estimadores estatísticos, como o método dos mínimos quadrados e suas variações, não são adequados para a identificação do sistema a partir deste experimento \cite{Aguirre2007}. Por isso, um modelo em função de transferência é escolhido.
+
+O trecho de curva correspondente ao primeiro degrau, entre as amostras $k = 1620$ e $k = 3500$, é utilizado para a identificação do modelo. A figura \ref{fig:experimento_ajuste} apresenta a curva nesta faixa.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../identificacao/experimento_ajuste.png}
+    \caption{Curva de resposta do sistema à aplicação do primeiro degrau, entre as amostras $k = 1620$ e $k = 3500$.}
+    \label{fig:experimento_ajuste}
+\end{figure}
+
+Pelas características físicas do sistema, é entendido que a dinâmica térmica da água é dominada pela dinâmica do sensor, ambas de primeira ordem. Assim, o modelo escolhido é o de um sistema de primeira ordem com atraso, cuja função de transferência é dada pela equação \ref{eq:fopdt_symbolic}.:
+
+\begin{equation}
+    G(s) = \frac{K e^{-\theta s}}{\tau s + 1},
+    \label{eq:fopdt_symbolic}
+\end{equation}
+
+A identificação dos parâmetros é feita a partir de um processo de otimização \cite{2020SciPy-NMeth} para o qual os parametros iniciais são dados pela análise da amplitude de regime permanente, da constante de tempo e do atraso, conforme \cite{ogata2010modern}. O modelo identificado é dado pela equação \ref{eq:fopdt_identificado} e a curva anotada pelos parametros identificados é apresentada na figura \ref{fig:tempos_modelo_tf}.
+
+\begin{equation}
+    G(s) = \frac{-0.134 e^{-1.043 s}}{29.050 s + 1}.
+    \label{eq:fopdt_identificado}
+\end{equation}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../identificacao/tempos_modelo_tf.png}
+    \caption{Curva de resposta do sistema à aplicação do primeiro degrau, entre as amostras $k = 1620$ e $k = 3500$, anotada pelos parâmetros identificados.}
+    \label{fig:tempos_modelo_tf}
+\end{figure}
+
+A validação do modelo é feita a partir da comparação entre a curva de resposta do sistema e a curva de resposta do modelo ao segundo degrau, entre as amostras $k = 3600$ e $k = 5400$. A figura \ref{fig:predicoes_modelo_tf_teste} apresenta a curva de resposta do modelo sobreposta à curva de resposta do sistema nesta faixa. A simulação é feita em \textit{free-run}, sem alimentação com medidas do sistema, além da condição inicial.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../identificacao/predicoes_modelo_tf_teste.png}
+    \caption{Curva de resposta do modelo sobreposta à curva de resposta do sistema, entre as amostras $k = 3600$ e $k = 5400$.}
+    \label{fig:predicoes_modelo_tf_teste}
+\end{figure}
+
+Pela similaridade entre as curvas, o modelo é considerado válido para representar a dinâmica do sistema. O erro quadrático médio (MSE) entre as curvas é de $0.006$, suficientemente baixo.
+
+\section{Projeto do Filtro Digital}
 
 \bibliography{bibliografia}
 
