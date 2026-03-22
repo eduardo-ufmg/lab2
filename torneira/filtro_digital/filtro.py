@@ -6,11 +6,12 @@ from data_io import load_experiment_data, plot_filtered_data, plot_filtered_data
 def main():
     L = 1.043  # seconds
     Ts = 0.1  # seconds
+    median_N = 5  # Odd integer for median filter window size
     y_range = (2.2, 3.2)  # temperature sensor voltage
-    delay_fraction = 0.2  # 20% of the plant delay
+    delay_fraction = 0.15  # 15% of the plant delay
 
     # Compute filter parameters
-    median_N, tau_f, alpha = compute_parameters(L, Ts, delay_fraction)
+    tau_f, alpha = compute_parameters(L, Ts, delay_fraction)
     print(
         f"Computed Parameters:\nMedian Filter Window Size: {median_N}\nLow-Pass Filter Time Constant (tau_f): {tau_f:.4f} seconds\nIIR Filter Coefficient (alpha): {alpha:.4f}"
     )
@@ -25,7 +26,7 @@ def main():
 
     # Apply the hybrid filter to the experimental data
     y_filtered = test_filter(
-        alpha, y, initial_state=y[0]
+        alpha, median_N, y, initial_state=y[0]
     )  # Use the first sample as the initial state for better transient response
 
     # Plot and save the results
