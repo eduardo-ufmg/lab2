@@ -1,67 +1,68 @@
+import collections
+from collections.abc import Callable
+
 import numpy as np
-from scipy.signal import lfilter, correlate
 
 
-def causal_median_filter_1d(y: np.ndarray, N: int = 3) -> np.ndarray:
-    """Applies a strictly causal 1D median filter of window size N."""
-    padded_y = np.pad(y, (N - 1, 0), mode="edge")
-    # Create sliding windows of size N
-    shape = (y.size, N)
-    strides = (padded_y.strides[0], padded_y.strides[0])
-    windows = np.lib.stride_tricks.as_strided(padded_y, shape=shape, strides=strides)
-    return np.median(windows, axis=1)
-
-
-def validate_filter_performance(
-    u: np.ndarray,
-    y: np.ndarray,
-    median_N: int,
-    alpha: float,
-    L: float,
-    Ts: float,
-    delay_fraction: float = 0.1,
-) -> dict:
+def create_filter(alpha: float, initial_state: float = 0.0) -> Callable[[float], float]:
     """
-    Validates the hybrid filter against experimental data.
+    Constructs a stateful closure for sample-by-sample hybrid filtering.
+
+    Args:
+        alpha: The IIR filter feedback coefficient (pole).
+        initial_state: The steady-state value prior to t=0.
 
     Returns:
-        A dictionary containing the filtered signal, the empirical delay
-        introduced, and the noise variance reduction ratio.
+        A function that accepts a single float sample and returns the filtered output.
     """
+    if not (0.0 <= alpha < 1.0):
+        raise ValueError("Pole alpha must strictly fall within the interval [0, 1).")
 
-    # 2. Apply Causal Median Filter
-    y_med = causal_median_filter_1d(y, N=median_N)
+    # State initialization
+    x_buffer = collections.deque([initial_state] * 3, maxlen=3)
 
-    # 3. Apply IIR Low-Pass Filter (Unity DC Gain)
-    # Difference equation: y_f[k] - alpha*y_f[k-1] = (1 - alpha)*y_med[k]
-    b = [1.0 - alpha]
-    a = [1.0, -alpha]
-    y_filtered = np.asarray(lfilter(b, a, y_med))
+    # Dictionary used to permit mutation within the closure scope
+    iir_state = {"y_prev": initial_state}
+    feedforward_coeff = 1.0 - alpha
 
-    # 4. Compute Metrics
-    # Noise reduction via discrete derivative variance
-    dy_raw_var = np.var(np.diff(y))
-    dy_filt_var = np.var(np.diff(y_filtered))
-    noise_attenuation_ratio = dy_filt_var / dy_raw_var if dy_raw_var > 0 else 1.0
+    def filter(x: float) -> float:
+        x_buffer.append(x)
 
-    # Empirical delay addition via cross-correlation with input u
-    # Subtract means to avoid DC bias in cross-correlation
-    u_centered = u - np.mean(u)
+        # Median operation (N=3)
+        x_med = sorted(x_buffer)[1]
 
-    corr_raw = correlate(y - np.mean(y), u_centered, mode="full")
-    lag_raw = np.argmax(corr_raw)
+        # IIR difference equation
+        y = alpha * iir_state["y_prev"] + feedforward_coeff * x_med
+        iir_state["y_prev"] = y
 
-    corr_filt = correlate(y_filtered - np.mean(y_filtered), u_centered, mode="full")
-    lag_filt = np.argmax(corr_filt)
+        return y
 
-    added_delay_samples = lag_filt - lag_raw
-    added_delay_seconds = added_delay_samples * Ts
+    return filter
 
-    return {
-        "y_filtered": y_filtered,
-        "metrics": {
-            "noise_variance_ratio": noise_attenuation_ratio,
-            "added_delay_seconds": added_delay_seconds,
-            "theoretical_max_added_delay": L * delay_fraction,
-        },
-    }
+
+def test_filter(alpha: float, y: np.ndarray, initial_state: float = 0.0) -> np.ndarray:
+    """
+    Instantiates the online hybrid filter and applies it sequentially to a data vector.
+
+    Args:
+        alpha: Discrete IIR filter coefficient [0, 1).
+        y: 1D array of experimental input samples.
+        initial_state: Initial condition for the filter states.
+
+    Returns:
+        1D array of filtered samples.
+    """
+    if not isinstance(y, np.ndarray) or y.ndim != 1:
+        raise ValueError("Input data must be a 1-dimensional NumPy array.")
+
+    # Instantiate the stateful closure
+    filter = create_filter(alpha, initial_state)
+
+    # Preallocate output array to match input dimensions
+    y_filtered = np.empty_like(y, dtype=float)
+
+    # Apply the filter sample-by-sample to simulate online operation
+    for i in range(len(y)):
+        y_filtered[i] = filter(y[i])
+
+    return y_filtered

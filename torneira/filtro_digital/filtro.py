@@ -1,44 +1,86 @@
-from design import compute_filter_parameters
-from test_filter import validate_filter_performance
-from data_io import load_experiment_data, plot_filtered_data
-import numpy as np
+from design import compute_parameters
+from test_filter import test_filter
+from data_io import load_experiment_data, plot_filtered_data, plot_filtered_data_xrange
 
 
 def main():
-    L_model = 1.043  # seconds
-    Ts_system = 0.100  # seconds
+    L = 1.043  # seconds
+    Ts = 0.1  # seconds
+    y_range = (2.2, 3.2)  # temperature sensor voltage
+    delay_fraction = 0.2  # 20% of the plant delay
 
-    N, tau, a = compute_filter_parameters(L=L_model, Ts=Ts_system)
+    # Compute filter parameters
+    median_N, tau_f, alpha = compute_parameters(L, Ts, delay_fraction)
+    print(
+        f"Computed Parameters:\nMedian Filter Window Size: {median_N}\nLow-Pass Filter Time Constant (tau_f): {tau_f:.4f} seconds\nIIR Filter Coefficient (alpha): {alpha:.4f}"
+    )
 
-    print("Computed Filter Parameters:")
-    print(f"Median Window (N): {N}")
-    print(f"IIR Time Constant (tau_f): {tau:.4f} s")
-    print(f"IIR Coefficient (alpha): {a:.6f}")
-    print(f"IIR Coefficient (1 - alpha): {1 - a:.6f}")
-
-    data = load_experiment_data("../identificacao/experimento.txt")
+    # Load experimental data
+    data_file = "experimento.txt"
+    data = load_experiment_data(data_file)
     if data is None:
         print("Failed to load experimental data. Exiting.")
         return
-
     k, u, y = data
 
-    results = validate_filter_performance(
-        u=u, y=y, median_N=N, alpha=a, L=L_model, Ts=Ts_system, delay_fraction=0.1
-    )
+    # Apply the hybrid filter to the experimental data
+    y_filtered = test_filter(
+        alpha, y, initial_state=y[0]
+    )  # Use the first sample as the initial state for better transient response
 
-    plot_filtered_data(k, y, results["y_filtered"], "filtered_output.png")
-    print("Filtered output plot saved as 'filtered_output.png'.")
-
-    valid_start = 1620
-
+    # Plot and save the results
+    plot_file = "experimento_filtrado.png"
     plot_filtered_data(
-        k[valid_start:],
-        y[valid_start:],
-        results["y_filtered"][valid_start:],
-        "filtered_output_valid.png",
+        k, y, y_filtered, plot_file, "Raw vs Filtered Output Voltage", y_range=y_range
     )
-    print("Filtered output plot for valid region saved as 'filtered_output_valid.png'.")
+    print(f"Filtered data plotted and saved to {plot_file}.")
+
+    # Plot and save a steady-state zoomed-in view
+    steady_state_range = (
+        3000,
+        3500,
+    )  # Sample indices corresponding to steady-state region
+    plot_file_stead_state = "experimento_filtrado_estacionario.png"
+    plot_filtered_data_xrange(
+        k,
+        y,
+        y_filtered,
+        plot_file_stead_state,
+        "Steady-State Filtered Output Voltage",
+        steady_state_range,
+    )
+    print(f"Steady-state filtered data plotted and saved to {plot_file_stead_state}.")
+
+    # Plot and save a response start zoomed-in view
+    response_start_range = (
+        1750,
+        1850,
+    )  # Sample indices corresponding to response start region
+    plot_file_response_start = "experimento_filtrado_resposta_inicial.png"
+    plot_filtered_data_xrange(
+        k,
+        y,
+        y_filtered,
+        plot_file_response_start,
+        "Response Start Filtered Output Voltage",
+        response_start_range,
+    )
+    print(
+        f"Response start filtered data plotted and saved to {plot_file_response_start}."
+    )
+
+    # Plot and save a transient zoomed-in view
+    transient_range = (2000, 2500)  # Sample indices corresponding to transient region
+    plot_file_transient = "experimento_filtrado_transitorio.png"
+    plot_filtered_data_xrange(
+        k,
+        y,
+        y_filtered,
+        plot_file_transient,
+        "Transient Filtered Output Voltage",
+        transient_range,
+    )
+    print(f"Transient filtered data plotted and saved to {plot_file_transient}.")
 
 
 if __name__ == "__main__":

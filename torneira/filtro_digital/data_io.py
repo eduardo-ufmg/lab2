@@ -34,45 +34,13 @@ def load_experiment_data(
         return None
 
 
-def plot_data(k: np.ndarray, u: np.ndarray, y: np.ndarray, file_path: str) -> None:
-    """
-    Plot the experimental data for input and output signals.
-
-    Parameters:
-    k (np.ndarray): The time steps of the experiment.
-    u (np.ndarray): The input signal values.
-    y (np.ndarray): The output signal values.
-    file_path (str): The path where the plot will be saved.
-
-    This function creates two subplots: one for the input signal and one for the output signal, both plotted against time steps.
-    """
-
-    plt.figure()
-
-    # Plot input signal
-    plt.subplot(2, 1, 1)
-    plt.plot(k, u, label="Input Voltage (V)")
-    plt.title("Input Voltage vs Time Steps")
-    plt.xlabel("Time Steps (k)")
-    plt.ylabel("Input Voltage (V)")
-    plt.grid()
-    plt.legend()
-
-    # Plot output signal
-    plt.subplot(2, 1, 2)
-    plt.plot(k, y, label="Temperature Sensor Voltage (V)")
-    plt.title("Temperature Sensor Voltage vs Time Steps")
-    plt.xlabel("Time Steps (k)")
-    plt.ylabel("Temperature Sensor Voltage (V)")
-    plt.grid()
-    plt.legend()
-
-    plt.tight_layout()
-    plt.savefig(file_path)
-
-
 def plot_filtered_data(
-    k: np.ndarray, y: np.ndarray, y_filtered: np.ndarray, file_path: str
+    k: np.ndarray,
+    y: np.ndarray,
+    y_filtered: np.ndarray,
+    file_path: str,
+    title: str,
+    y_range: tuple[float, float] | None = None,
 ) -> None:
     """
     Plot the raw and filtered output signals.
@@ -82,17 +50,50 @@ def plot_filtered_data(
     y (np.ndarray): The raw output signal values.
     y_filtered (np.ndarray): The filtered output signal values.
     file_path (str): The path where the plot will be saved.
+    title (str): The title for the plot.
+    y_range (tuple[float, float] | None): The valid range for the output signal values.
 
     This function creates a single plot comparing the raw and filtered output signals against time steps.
     """
 
     plt.figure()
-    plt.plot(k, y, label="Raw Output Voltage (V)", alpha=0.7)
-    plt.plot(k, y_filtered, label="Filtered Output Voltage (V)", alpha=0.7)
-    plt.title("Raw vs Filtered Output Voltage vs Time Steps")
+    if y_range is not None:
+        plt.ylim(y_range)
+    plt.plot(k, y, label="Raw Output Voltage (V)")
+    plt.plot(k, y_filtered, label="Filtered Output Voltage (V)")
+    plt.title(title)
     plt.xlabel("Time Steps (k)")
     plt.ylabel("Output Voltage (V)")
     plt.grid()
     plt.legend()
     plt.tight_layout()
     plt.savefig(file_path)
+
+
+def plot_filtered_data_xrange(
+    k: np.ndarray,
+    y: np.ndarray,
+    y_filtered: np.ndarray,
+    file_path: str,
+    title: str,
+    x_range: tuple[int, int],
+) -> None:
+    """
+    Plot the raw and filtered output signals for a specific range of time steps.
+
+    Parameters:
+    k (np.ndarray): The time steps of the experiment.
+    y (np.ndarray): The raw output signal values.
+    y_filtered (np.ndarray): The filtered output signal values.
+    file_path (str): The path where the plot will be saved.
+    title (str): The title for the plot.
+    x_range (tuple[int, int]): The range of time steps to plot.
+    """
+
+    plot_filtered_data(
+        k[x_range[0] : x_range[1]],
+        y[x_range[0] : x_range[1]],
+        y_filtered[x_range[0] : x_range[1]],
+        file_path,
+        title,
+    )

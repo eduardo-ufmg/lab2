@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def compute_filter_parameters(
+def compute_parameters(
     L: float, Ts: float, delay_fraction: float = 0.1
 ) -> tuple[int, float, float]:
     """
@@ -14,7 +14,7 @@ def compute_filter_parameters(
                         Defaults to 0.1 (10%) to preserve closed-loop phase margin.
 
     Returns:
-        median_N: Window size for the median filter (fixed to 3).
+        median_N: Window size for the median filter.
         tau_f: Continuous time constant of the low-pass filter (seconds).
         alpha: Discrete IIR filter coefficient for the previous output.
     """
@@ -26,7 +26,7 @@ def compute_filter_parameters(
         raise ValueError("Delay fraction must be within the interval (0, 1).")
 
     # 1. Median Filter Parameter
-    median_N = 3
+    median_N = 7
 
     # 2. IIR Low-Pass Filter Parameters
     tau_f = L * delay_fraction
