@@ -12,23 +12,23 @@ def create_filter(
     if median_N < 1 or median_N % 2 == 0:
         raise ValueError("median_N must be a strictly positive odd integer.")
 
-    x_buffer = collections.deque([initial_state] * median_N, maxlen=median_N)
+    y_buffer = collections.deque([initial_state] * median_N, maxlen=median_N)
     feedforward_coeff = 1.0 - alpha
     y_prev = initial_state  # Python 3 scalar state
 
-    def filter_func(x: float) -> float:
+    def filter_func(y: float) -> float:
         nonlocal y_prev  # Declare nonlocal scope
 
-        x_buffer.append(x)
+        y_buffer.append(y)
 
         # Dynamic median operation
-        x_med = sorted(x_buffer)[median_N // 2]
+        y_med = sorted(y_buffer)[median_N // 2]
 
         # IIR difference equation
-        y = alpha * y_prev + feedforward_coeff * x_med
-        y_prev = y
+        y_filtered = alpha * y_prev + feedforward_coeff * y_med
+        y_prev = y_filtered
 
-        return y
+        return y_filtered
 
     return filter_func
 
