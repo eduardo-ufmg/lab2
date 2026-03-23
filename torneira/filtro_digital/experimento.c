@@ -38,7 +38,7 @@ typedef struct
     int k;
     float64 u;
     float64 y;
-    float64 y_filtered;
+    float64 y_est;
 } sample_t;
 
 typedef struct
@@ -182,7 +182,7 @@ void * control_loop_task(void * arg)
         record_buffer[sample_ctr].k = sample_ctr;
         record_buffer[sample_ctr].u = data_write;
         record_buffer[sample_ctr].y = data_read;
-        record_buffer[sample_ctr].y_filtered = data_filtered;
+        record_buffer[sample_ctr].y_est = data_filtered;
     }
 
     return NULL;
@@ -224,12 +224,12 @@ int main(void)
 
     FILE * exp_data_f = fopen("experimento.txt", "w");
     if (exp_data_f) {
-        fprintf(exp_data_f, "k, u, y, y_filtered\n");
+        fprintf(exp_data_f, "k, u, y, y_est\n");
         for (int i = 0; i < N_SAMPLES; ++i) {
             if (i > 0 && record_buffer[i].k == 0 && record_buffer[i].u == 0.0)
                 break;
             fprintf(exp_data_f, "%d, %lf, %lf, %lf\n", record_buffer[i].k, record_buffer[i].u,
-                    record_buffer[i].y, record_buffer[i].y_filtered);
+                    record_buffer[i].y, record_buffer[i].y_est);
         }
         fclose(exp_data_f);
     } else {
