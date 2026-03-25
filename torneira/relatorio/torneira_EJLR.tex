@@ -115,7 +115,7 @@ A figura \ref{fig:modelo_vs_referencia} apresenta a comparação entre a respost
 
 Por analise visual, o modelo identificado foi considerado adequado.
 
-\section{Projeto do Filtro Digital}
+\section{Filtro Digital}
 
 Na resposta do sistema, é observada alta incidência de ruído impulsivo, caracterizado por perturbações pontuais de alta amplitude. Para mitigar seus efeitos, um filtro digital de mediana móvel é proposto por \cite{Geoffrine2011}. O tamanho da janela do filtro foi escolhido como $N = 5$ amostras, por experimentação. A figura \ref{fig:mediana} apresenta a comparação entre o sinal bruto e o sinal filtrado.
 
@@ -205,6 +205,8 @@ Já a comparação entre os resíduos do sinal bruto, filtrado pela mediana móv
     \label{fig:residuos}
 \end{figure}
 
+As curvas em \ref{fig:filtro} indicam preservação da dinâmica do sistema pelo filtro digital, dado que a resposta filtrada segue a resposta do sistema com fidelidade de tendência. Por outro lado, análise visual das curvas de resíduos sugere que o filtro digital atenua os efeitos do ruído de alta frequência melhor do que o filtro de mediana móvel, o que coincide com a expectativa dada pela análise de frequência do sistema e do filtro digital.
+
 Por fim, \ref{fig:validacao} apresenta a comparação entre os sinais bruto e filtrado pela implementação completa do filtro digital no sistema em tempo real, obtidas em um novo experimento, de validação.
 
 \begin{figure}[H]
@@ -215,6 +217,8 @@ Por fim, \ref{fig:validacao} apresenta a comparação entre os sinais bruto e fi
 \end{figure}
 
 A perturbação retangular, de alta amplitude e curta duração, observada na seção anterior à considerada válida, é considerada defeito no sistema de condicionamento do sinal e não tratada neste trabalho.
+
+\section{Controlador}
 
 
 

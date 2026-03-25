@@ -66,7 +66,7 @@ def plot_filter(
         plt.ylim(ylim)
 
     plt.xlabel("Amostra")
-    plt.ylabel("Tensão Medida (V)")
+    plt.ylabel("Tensão (V)")
     plt.grid()
     plt.legend()
     plt.tight_layout()

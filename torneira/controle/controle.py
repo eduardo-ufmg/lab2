@@ -1,15 +1,7 @@
 import numpy as np
-import control as ct
 import matplotlib.pyplot as plt
 
-
-def tune(K: float, tau: float, tau_c: float) -> tuple[float, float]:
-    """
-    Synthesizes PI controller gains using IMC tuning.
-    """
-    Kp = tau / (K * tau_c)
-    Ki = 1.0 / (K * tau_c)
-    return Kp, Ki
+from collections import deque
 
 
 def test(
@@ -21,120 +13,131 @@ def test(
     t_end: float,
     u_min: float,
     u_max: float,
+    u_0: float,
+    y_0: float,
+    r_array: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Simulates the closed-loop system iteratively to accommodate output saturation and anti-windup.
+    Simulates the closed-loop system iteratively with a time-varying reference array,
+    deviation variables, and an anti-windup clamping mechanism.
     """
     time_vector = np.arange(0, t_end, Ts)
     N = len(time_vector)
 
-    # State vectors
-    y = np.zeros(N)
-    y_hat = np.zeros(N)
-    u = np.zeros(N)
+    # Pre-allocate state arrays
+    y = np.full(N, y_0)
+    y_hat = np.full(N, y_0)
+    u = np.full(N, u_0)
     e = np.zeros(N)
 
     # Plant ZOH difference equation coefficients
-    # G(s) = K / (tau*s + 1) -> G(z) = b_p / (z - a_p)
     a_p = np.exp(-Ts / tau_plant)
     b_p = K_plant * (1.0 - a_p)
 
-    # Filter parameters (M-point median filter + exponential smoothing)
-    ALPHA = 0.88
-    M = 5
-    filter_hist = np.zeros(M)
-    y_hat_prev = 0.0
+    # Filter parameters
+    filter_median_window = 5
+    alpha = 0.88
+    buffer = deque(maxlen=filter_median_window)
 
     # Controller states
     u_i = 0.0
     e_prev = 0.0
 
-    # Reference signal
-    half_n = N // 2
-    r = np.concat(np.full(half_n, 1), np.full(N - half_n, -1))
-
     for n in range(1, N):
-        # 1. Plant update
-        y[n] = a_p * y[n - 1] + b_p * u[n - 1]
+        # 1. Plant update (Deviation formulation)
+        y[n] = a_p * y[n - 1] + (1.0 - a_p) * y_0 + b_p * (u[n - 1] - u_0)
 
         # 2. Filter update
-        filter_hist = np.roll(filter_hist, -1)
-        filter_hist[-1] = y[n]
-        x = np.median(filter_hist)
-        y_hat[n] = ALPHA * y_hat_prev + (1.0 - ALPHA) * x
-        y_hat_prev = y_hat[n]
+        buffer.append(y[n])
+        x = np.median(buffer)
+        y_hat[n] = alpha * y_hat[n - 1] + (1.0 - alpha) * x
 
         # 3. Error computation
-        e[n] = r[n] - y_hat[n]
+        e[n] = r_array[n] - y_hat[n]
 
-        # 4. Controller update (Tustin with Anti-Windup)
+        # 4. Controller update (Tustin)
         u_p = Kp * e[n]
         u_i_temp = u_i + (Ki * Ts / 2.0) * (e[n] + e_prev)
-        v = u_p + u_i_temp
+        v_pi = u_p + u_i_temp  # Deviation control effort (delta_u)
 
-        # Saturation
-        u[n] = np.clip(v, u_min, u_max)
+        # 5. Bias addition and Saturation
+        v_absolute = v_pi + u_0
+        u[n] = np.clip(v_absolute, u_min, u_max)
 
-        # Anti-windup back-calculation
-        u_i = u[n] - u_p
+        # 6. Anti-windup back-calculation
+        delta_u_actual = u[n] - u_0
+        u_i = delta_u_actual - u_p
         e_prev = e[n]
 
     return time_vector, y, u
 
 
-def plot_response(
-    time_vector: np.ndarray,
-    y: np.ndarray,
-    u: np.ndarray,
-    filename: str = "step_response.png",
-) -> None:
-    """
-    Generates a two-panel plot for system output and control effort.
-    """
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+def main() -> None:
+    # System Parameters
+    Ts = 0.1
+    K_plant = -0.14
+    tau_plant = 35.77
+    tau_c = 15.0
+    t_end = 5400.0
 
-    # Output Plot
-    ax1.plot(time_vector, y, label="Output y(t)", color="blue")
-    ax1.axhline(-0.5, color="red", linestyle="--", label="Reference r(t)")
-    ax1.set_title("Closed-Loop Output Response")
-    ax1.set_ylabel("Amplitude")
+    # Hardware constraints and operating point
+    u_min = 2.0
+    u_max = 8.0
+    y_0 = 27.0
+    u_0 = 5.0  # Assumed equilibrium control effort
+
+    # Controller Design (IMC)
+    Kp = tau_plant / (K_plant * tau_c)
+    Ki = 1.0 / (K_plant * tau_c)
+    print(f"Controller Parameters: Kp = {Kp:.4f}, Ki = {Ki:.4f}")
+
+    # Generate Reference Trajectory
+    time_vector = np.arange(0, t_end, Ts)
+    N = len(time_vector)
+    r_array = np.full(N, y_0)
+
+    # Steps
+    r_array[time_vector >= t_end / 3] = 27.3
+    r_array[time_vector >= 2 * t_end / 3] = 26.7
+
+    # Execute Simulation
+    time_vector, y, u = test(
+        Kp=Kp,
+        Ki=Ki,
+        K_plant=K_plant,
+        tau_plant=tau_plant,
+        Ts=Ts,
+        t_end=t_end,
+        u_min=u_min,
+        u_max=u_max,
+        u_0=u_0,
+        y_0=y_0,
+        r_array=r_array,
+    )
+
+    # Plot Results
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+    ax1.plot(time_vector, y, label="Saída do Sistema")
+    ax1.plot(time_vector, r_array, label="Referência")
+    ax1.set_title("Resposta em Malha Fechada da Temperatura")
+    ax1.set_ylabel("Temperatura (°C)")
     ax1.grid(True)
     ax1.legend()
 
-    # Control Effort Plot
-    ax2.plot(time_vector, u, label="Control Effort u(t)", color="green")
-    ax2.axhline(8.0, color="black", linestyle=":", label="Limit (8V)")
-    ax2.axhline(2.0, color="black", linestyle=":", label="Limit (2V)")
-    ax2.set_title("Controller Output")
-    ax2.set_xlabel("Time (s)")
-    ax2.set_ylabel("Voltage (V)")
+    ax2.plot(time_vector, u, label="Sinal de Controle")
+    ax2.axhline(u_max, color="black", linestyle=":", label="Limite Superior")
+    ax2.axhline(u_min, color="black", linestyle=":", label="Limite Inferior")
+    ax2.axhline(u_0, color="gray", linestyle="-.", label="Equilíbrio")
+    ax2.set_title("Saída do Controlador")
+    ax2.set_xlabel("Tempo (s)")
+    ax2.set_ylabel("Tensão (V)")
     ax2.grid(True)
     ax2.legend()
 
     plt.tight_layout()
-    plt.savefig(filename, dpi=300)
-    plt.close()
-
-
-def main() -> None:
-    Ts = 0.1
-    K_plant = -0.14
-    tau_plant = 35.77
-    tau_c = 10.0
-    t_end = 100.0
-    u_min = 2.0
-    u_max = 8.0
-
-    # 1. Design
-    Kp, Ki = tune(K_plant, tau_plant, tau_c)
-    print(f"Continuous PI Gains: Kp = {Kp:.4f}, Ki = {Ki:.4f}")
-
-    # 2. Test (Non-linear simulation)
-    time_vector, y, u = test(Kp, Ki, K_plant, tau_plant, Ts, t_end, u_min, u_max)
-
-    # 3. Plot
-    plot_response(time_vector, y, u)
-    print("Simulation complete. Plot saved to 'step_response.png'.")
+    plt.savefig("degraus.png")
+    print("Simulation complete. Profile plotted to 'degraus.png'.")
 
 
 if __name__ == "__main__":

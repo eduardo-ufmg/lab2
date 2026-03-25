@@ -22,6 +22,15 @@ def main():
     median_filter = DigitalFilter(median_window_size=5, alpha=0.0)
     y_median = np.array([median_filter.filter(y_i) for y_i in y])
 
+    # Plot the original and median-filtered signals
+    plot_filter(
+        k,
+        y,
+        y_median,
+        file_path="mediana.png",
+        ylim=(2.2, 3.2),
+    )
+
     # Apply complete digital filter to the data
     complete_filter = DigitalFilter(median_window_size=5, alpha=0.88)
     y_hat = np.array([complete_filter.filter(y_i) for y_i in y])
