@@ -1,21 +1,10 @@
-import numpy as np
-
 from data_io import (
     load_experiment_data,
     plot_data,
-    plot_predictions_poly,
-    plot_ss,
-    plot_predictions_poly_gb,
-    plot_tf_times,
-    plot_tf_predictions,
+    plot_model,
 )
-from preprocess import prepare_data
-from poly_models import fit_arx, test_arx, fit_oe, test_oe
-from ss_models import fit_ss, test_ss, get_states_from_output
-from greybox_models import fit_arx_graybox, fit_oe_graybox, fit_ss_graybox
-from tf_model import fit_tf, test_tf
+from fit_test import fit, test
 
-MODELS = ["TF"]
 Ts = 0.1
 
 
@@ -29,200 +18,41 @@ def main():
 
     plot_data(k, u, y, "experimento.png")
 
-    (
-        k_fit,
-        u_fit,
-        y_fit,
-        k_test,
-        u_test,
-        y_test,
-        u_fit_demeaned,
-        y_fit_demeaned,
-        u_test_demeaned,
-        y_test_demeaned,
-        y_fit_mean,
-    ) = prepare_data(k, u, y)
+    valid_start = test_start = 1620
+    valid_end = test_end = 5400
 
-    delay_firstorder = 25
-    delay_secondorder = 10
+    fit_start, fit_end = 1800, 3600
 
-    if "POLY" in MODELS:
-        orders = [1, 2]
+    k_valid, u_valid, y_valid = (
+        k[valid_start:valid_end],
+        u[valid_start:valid_end],
+        y[valid_start:valid_end],
+    )
+    k_fit, u_fit, y_fit = (
+        k[fit_start:fit_end],
+        u[fit_start:fit_end],
+        y[fit_start:fit_end],
+    )
+    k_test, u_test, y_test = (
+        k[test_start:test_end],
+        u[test_start:test_end],
+        y[test_start:test_end],
+    )
 
-        arx_results = {}
-        oe_results = {}
+    y_0 = y_valid[0]
 
-        delays = {
-            1: delay_firstorder,
-            2: delay_secondorder,
-        }
+    plot_data(k_valid, u_valid, y_valid, "experimento_valido.png")
 
-        for order in orders:
+    K_0 = (y_fit[-1] - y_0) / (u_fit[-1] - u_fit[0])
+    tau_0 = len(y_fit) * Ts / 5
 
-            y_init = y_test_demeaned[: max(order, delays[order])]
+    K, tau = fit(K_0, tau_0, Ts, u_test, y_test, y_0)
 
-            arx_theta = fit_arx(order, delays[order], u_fit_demeaned, y_fit_demeaned)
-            arx_y_pred, arx_mse = test_arx(
-                order,
-                delays[order],
-                arx_theta,
-                u_test_demeaned,
-                y_test_demeaned,
-                y_init,
-            )
-            arx_y_pred_remeaned = arx_y_pred + y_fit_mean
-            arx_results[order] = (arx_y_pred_remeaned, arx_mse)
+    print(f"Estimated parameters: K = {K:.4f}, tau = {tau:.4f} s")
 
-            oe_theta = fit_oe(order, delays[order], u_fit_demeaned, y_fit_demeaned)
-            oe_y_pred, oe_mse = test_oe(
-                order,
-                delays[order],
-                oe_theta,
-                u_test_demeaned,
-                y_test_demeaned,
-                y_init,
-            )
-            oe_y_pred_remeaned = oe_y_pred + y_fit_mean
-            oe_results[order] = (oe_y_pred_remeaned, oe_mse)
+    y_pred = test(K, tau, Ts, u_test, y_0=y_0)
 
-        plot_predictions_poly(
-            k_test, y_test, arx_results, oe_results, "predicoes_modelos_polinomiais.png"
-        )
-
-        for order, (_, mse) in arx_results.items():
-            print(f"ARX({order}) MSE: {mse:.4f}")
-
-        for order, (_, mse) in oe_results.items():
-            print(f"OE({order}) MSE: {mse:.4f}")
-
-    if "SS" in MODELS:
-        ss_matrices = fit_ss(2, delay_firstorder, u_fit_demeaned, y_fit_demeaned)
-        nx_est = ss_matrices[0].shape[0]
-
-        # Estimate initial state from the first test output sample.
-        x_init = get_states_from_output(ss_matrices[2], y_test_demeaned[0])
-
-        ss_y_pred, ss_mse, ss_states = test_ss(
-            nx_est,
-            delay_firstorder,
-            ss_matrices,
-            u_test_demeaned,
-            y_test_demeaned,
-            x_init,
-        )
-        ss_y_pred_remeaned = ss_y_pred + y_fit_mean
-
-        plot_ss(
-            k_test,
-            y_test,
-            {nx_est: (ss_y_pred_remeaned, ss_mse)},
-            {nx_est: ss_states},
-            "predicoes_modelo_ss.png",
-        )
-
-        print(f"SS({nx_est}) MSE: {ss_mse:.4f}")
-
-    if "GREYBOX" in MODELS:
-        arx_gb_theta, arx_gb_order, arx_gb_nk = fit_arx_graybox(
-            u_fit_demeaned, y_fit_demeaned
-        )
-        arx_gb_y_pred, arx_gb_mse = test_arx(
-            arx_gb_order,
-            arx_gb_nk,
-            arx_gb_theta,
-            u_test_demeaned,
-            y_test_demeaned,
-            y_test_demeaned[: max(arx_gb_order, arx_gb_nk)],
-        )
-        arx_gb_y_pred_remeaned = arx_gb_y_pred + y_fit_mean
-        print(f"Grey-box ARX MSE: {arx_gb_mse:.4f}")
-
-        oe_gb_theta, oe_gb_order, oe_gb_nk = fit_oe_graybox(
-            u_fit_demeaned, y_fit_demeaned
-        )
-        oe_gb_y_pred, oe_gb_mse = test_oe(
-            oe_gb_order,
-            oe_gb_nk,
-            oe_gb_theta,
-            u_test_demeaned,
-            y_test_demeaned,
-            y_test_demeaned[: max(oe_gb_order, oe_gb_nk)],
-        )
-        oe_gb_y_pred_remeaned = oe_gb_y_pred + y_fit_mean
-        print(f"Grey-box OE MSE: {oe_gb_mse:.4f}")
-
-        plot_predictions_poly_gb(
-            k_test,
-            y_test,
-            (arx_gb_y_pred_remeaned, arx_gb_mse),
-            (oe_gb_y_pred_remeaned, oe_gb_mse),
-            "predicoes_modelos_poli_greybox.png",
-        )
-
-        ss_gb_matrices, ss_gb_order, ss_gb_nk = fit_ss_graybox(
-            u_fit_demeaned, y_fit_demeaned
-        )
-        nx_gb_est = ss_gb_matrices[0].shape[0]
-        x_gb_init = get_states_from_output(ss_gb_matrices[2], y_test_demeaned[0])
-        ss_gb_y_pred, ss_gb_mse, ss_gb_states = test_ss(
-            nx_gb_est,
-            ss_gb_nk,
-            ss_gb_matrices,
-            u_test_demeaned,
-            y_test_demeaned,
-            x_gb_init,
-        )
-        ss_gb_y_pred_remeaned = ss_gb_y_pred + y_fit_mean
-        print(f"Grey-box SS({nx_gb_est}) MSE: {ss_gb_mse:.4f}")
-
-        plot_ss(
-            k_test,
-            y_test,
-            {nx_gb_est: (ss_gb_y_pred_remeaned, ss_gb_mse)},
-            {nx_gb_est: ss_gb_states},
-            "predicoes_modelo_ss_greybox.png",
-        )
-
-    if "TF" in MODELS:
-        K_tf, tau_tf, L_tf, step_idx = fit_tf(k_fit, u_fit, y_fit, Ts=Ts)
-        print(f"FOPDT Parameters: K={K_tf:.4f}, tau={tau_tf:.4f}, L={L_tf:.4f}")
-
-        plot_tf_times(
-            k_fit,
-            u_fit,
-            y_fit,
-            tau_tf,
-            L_tf,
-            Ts=Ts,
-            step_idx=step_idx,
-            file_path="tempos_modelo_tf.png",
-        )
-
-        tf_y_pred, tf_mse = test_tf(K_tf, tau_tf, L_tf, u_test, y_test, Ts=Ts)
-
-        plot_tf_predictions(
-            k_test, y_test, (tf_y_pred, tf_mse), "predicoes_modelo_tf.png"
-        )
-
-        test_minus_fit_time = (
-            3600 - 1620
-        )  # Testa apenas a parte do teste, ignorando o ajuste
-
-        tf_y_pred_test, tf_mse_test = test_tf(
-            K_tf,
-            tau_tf,
-            L_tf,
-            u_test[test_minus_fit_time:],
-            y_test[test_minus_fit_time:],
-            Ts=Ts,
-        )
-
-        plot_tf_predictions(
-            k_test[test_minus_fit_time:],
-            y_test[test_minus_fit_time:],
-            (tf_y_pred_test, tf_mse_test),
-            "predicoes_modelo_tf_teste.png",
-        )
+    plot_model(k_test, y_test, y_pred, "modelo_vs_referencia.png", ylim=(2.2, 3.2))
 
 
 if __name__ == "__main__":
