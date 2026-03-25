@@ -1,8 +1,4 @@
-from data_io import (
-    load_experiment_data,
-    plot_data,
-    plot_model,
-)
+from data_io import load_experiment_data, plot_data, plot_model, save_model_predictions
 from fit_test import fit, test
 
 Ts = 0.1
@@ -53,6 +49,8 @@ def main():
     y_pred = test(K, tau, Ts, u_test, y_0=y_0)
 
     plot_model(k_test, y_test, y_pred, "modelo_vs_referencia.png", ylim=(2.2, 3.2))
+
+    save_model_predictions(k_test, y_pred, "predicoes_modelo.csv")
 
 
 if __name__ == "__main__":

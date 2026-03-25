@@ -25,6 +25,9 @@ Thumbs.db
 *.out
 *.app
 
+# Binary
+experimento
+
 # Build directories
 build/
 bin/

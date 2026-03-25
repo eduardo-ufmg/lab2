@@ -25,7 +25,7 @@ def load_experiment_data(
         # Strip whitespace from column headers (e.g., ' u' -> 'u')
         data.columns = data.columns.str.strip()
         return (
-            data["k"].to_numpy(dtype=float),
+            data["k"].to_numpy(dtype=int),
             data["u"].to_numpy(dtype=float),
             data["y"].to_numpy(dtype=float),
         )
@@ -52,7 +52,6 @@ def plot_data(k: np.ndarray, u: np.ndarray, y: np.ndarray, file_path: str) -> No
     # Plot input signal
     plt.subplot(2, 1, 1)
     plt.plot(k, u)
-    plt.title("Tensão Aplicada vs Amostras")
     plt.xlabel("Amostra")
     plt.ylabel("Tensão Aplicada (V)")
     plt.grid()
@@ -60,7 +59,6 @@ def plot_data(k: np.ndarray, u: np.ndarray, y: np.ndarray, file_path: str) -> No
     # Plot output signal
     plt.subplot(2, 1, 2)
     plt.plot(k, y)
-    plt.title("Tensão Medida vs Amostras")
     plt.xlabel("Amostra")
     plt.ylabel("Tensão Medida (V)")
     plt.grid()
@@ -96,10 +94,25 @@ def plot_model(
     if ylim is not None:
         plt.ylim(ylim)
 
-    plt.title("Comparação entre Referência e Inferência do Modelo")
     plt.xlabel("Amostra")
     plt.ylabel("Tensão Medida (V)")
     plt.grid()
     plt.legend()
     plt.tight_layout()
     plt.savefig(file_path)
+
+
+def save_model_predictions(k: np.ndarray, y_pred: np.ndarray, file_path: str) -> None:
+    """
+    Saves the model predictions to a CSV file.
+
+    Parameters:
+    k (np.ndarray): The sample indices corresponding to the predictions.
+    y_pred (np.ndarray): The predicted output signal values from the model.
+    file_path (str): The path where the CSV file will be saved.
+
+    This function creates a CSV file with two columns: 'k' for sample indices and 'y_pred' for model predictions.
+    """
+
+    df = pd.DataFrame({"k": k, "y_pred": y_pred})
+    df.to_csv(file_path, index=False)

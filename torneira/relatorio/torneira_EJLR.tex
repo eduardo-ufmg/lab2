@@ -122,7 +122,7 @@ Na resposta do sistema, é observada alta incidência de ruído impulsivo, carac
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.75\linewidth]{../filtro/mediana.png}
-    \caption{Comparação entre o sinal bruto e o sinal filtrado.}
+    \caption{Comparação entre o sinal bruto e o sinal filtrado pelo filtro de mediana móvel.}
     \label{fig:mediana}
 \end{figure}
 
@@ -139,11 +139,11 @@ Para fins de aprendizado, no entanto, é analizada a justificativa de filtragem 
 
 Neste, $\alpha = e^{-\frac{T_s}{\tau_f}}$, onde $T_s$ é o período de amostragem e $\tau_f = \frac{1}{2 \pi f_c}$ é a constante de tempo do filtro, com $f_c$ a frequência de corte.
 
-Para não atenuar a dinâmica do sistema, $f_c \gg f_\text{mf}$, onde $f_\text{mf} = \frac{1}{2 \pi \tau_\text{mf}}$ é dada pela constante de tempo desejada para o sistema em malha fechada. Conservadoramente, é escolhido $\tau_\text{mf} = 0.5 \tau = 17.89$, o que corresponde a $f_\text{mf} = 0.01 Hz$. Pelo teorema de Nyquist-Shannon\cite{Aguirre2023}, $f_c \ll f_\text{Nyquist}$, onde $f_\text{Nyquist} = \frac{1}{2 T_s} = 5 Hz$. Destas condições, temos
+Para não atenuar a dinâmica do sistema, $f_c \gg f_\text{mf}$, onde $f_\text{mf} = \frac{1}{2 \pi \tau_\text{mf}}$ é dada pela constante de tempo desejada para o sistema em malha fechada. Conservadoramente, é escolhido $\tau_\text{mf} = 0.5 \tau = 17.89$, o que corresponde a $f_\text{mf} = 0.01\ \text{Hz}$. Pelo teorema de Nyquist-Shannon\cite{Aguirre2023}, $f_c \ll f_\text{Nyquist}$, onde $f_\text{Nyquist} = \frac{1}{2 T_s} = 5\ \text{Hz}$. Destas condições, temos
 
 \begin{equation}
     \label{eq:condicoes_filtro}
-    0.01 Hz \ll f_c \ll 5 Hz
+    0.01\ \text{Hz} \ll f_c \ll 5\ \text{Hz}
 \end{equation}
 
 No espaço logarítmico,
@@ -186,6 +186,33 @@ O filtro digital completo é dado pela equação \ref{eq:filtro_completo}.
         \hat{y}[n] = 0.12 x[n] + 0.88 \hat{y}[n - 1]
     \end{cases}
 \end{equation}
+
+A figura \ref{fig:filtro} apresenta a comparação entre o sinal bruto e o sinal filtrado pelo filtro digital completo.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../filtro/filtro.png}
+    \caption{Comparação entre o sinal bruto e o sinal filtrado pelo filtro digital completo.}
+    \label{fig:filtro}
+\end{figure}
+
+Já a comparação entre os resíduos do sinal bruto, filtrado pela mediana móvel, e filtrado pelo filtro digital completo é apresentada na figura \ref{fig:residuos}. Os resíduos são calculados em relação à resposta do modelo identificado.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../filtro/residuos.png}
+    \caption{Comparação entre os resíduos do sinal bruto, filtrado pela mediana móvel, e filtrado pelo filtro digital completo. Nesta figura, as curvas azul, laranja e verde correspondem, respectivamente, aos resíduos do sinal bruto, filtrado pela mediana móvel e filtrado pelo filtro digital completo.}
+    \label{fig:residuos}
+\end{figure}
+
+Por fim, \ref{fig:validacao} apresenta a comparação entre os sinais bruto e filtrado pela implementação completa do filtro digital no sistema em tempo real, obtidas em um novo experimento, de validação.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../filtro/validacao.png}
+    \caption{Experimento de validação do filtro digital no sistema em tempo real.}
+    \label{fig:validacao}
+\end{figure}
 
 A perturbação retangular, de alta amplitude e curta duração, observada na seção anterior à considerada válida, é considerada defeito no sistema de condicionamento do sinal e não tratada neste trabalho.
 

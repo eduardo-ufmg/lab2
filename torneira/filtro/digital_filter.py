@@ -1,5 +1,6 @@
 import numpy as np
 
+from collections import deque
 from dataclasses import dataclass
 
 
@@ -12,13 +13,11 @@ class DigitalFilter:
 
     def __post_init__(self):
         """Initialize any additional attributes if necessary."""
-        self.buffer = np.zeros(self.median_window_size)
-        self.index = 0
+        self.buffer = deque(maxlen=self.median_window_size)
 
     def median(self, y: float) -> float:
         """Calculate the median of the current buffer."""
-        self.buffer[self.index] = y
-        self.index = (self.index + 1) % self.median_window_size
+        self.buffer.append(y)
         return float(np.median(self.buffer))
 
     def first_order(self, x: float) -> float:
