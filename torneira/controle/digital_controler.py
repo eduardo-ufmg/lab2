@@ -18,17 +18,20 @@ class DigitalController:
         # Calculate parameter p and analytical coefficients
         p = math.exp(-T_s / tau_cl)
 
-        self.b0 = -250.0 * (1.0 - p)
-        self.b1 = 469.25 * (1.0 - p)
-        self.b2 = -219.34 * (1.0 - p)
+        # Calculate parameter alpha for a critically damped second-order target
+        alpha = math.exp(-T_s / tau_cl)
+        alpha_sq = alpha * alpha
+        one_minus_alpha_sq = (1.0 - alpha) ** 2
 
-        self.a1 = p + 0.88
-        self.a2 = -0.88 * p
-        self.a3 = 0.12 * (1.0 - p)
+        # Numerator coefficients
+        self.b0 = -250.0 * one_minus_alpha_sq
+        self.b1 = 469.25 * one_minus_alpha_sq
+        self.b2 = -219.34 * one_minus_alpha_sq
 
-        print(
-            f"u[n] = {self.b0:.2f}*e[n] + {self.b1:.2f}*e[n-1] + {self.b2:.2f}*e[n-2] + {self.a1:.2f}*u[n-1] + {self.a2:.2f}*u[n-2] + {self.a3:.2f}*u[n-3]"
-        )
+        # Denominator coefficients
+        self.a1 = 2.0 * alpha + 0.88
+        self.a2 = -(alpha_sq + 1.76 * alpha)
+        self.a3 = alpha_sq - 0.24 * alpha + 0.12
 
         # Past error states: e[n-1], e[n-2]
         self.e_1 = 0.0

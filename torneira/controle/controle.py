@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 from discrete_system import DiscreteSystem
 from digital_filter import DigitalFilter
@@ -35,20 +36,20 @@ if __name__ == "__main__":
     controller.set_auto(True)
 
     # Simulation Setup
-    time_steps = 5600
+    time_steps = 24000
     noise_std = 0.2
 
     # Reference Trajectory Setup
-    step0_mag = 3.0
-    step0_time_k = 200
-    step1_mag = 1.5
-    step1_time_k = 1800
+    step0_mag = 8.0
+    step0_time_k = 600
+    step1_mag = 4.0
+    step1_time_k = 7200
 
     # Disturbance Setup
-    dist0_mag = -1.5
-    dist0_start_k = 3300
-    dist1_mag = 1.0
-    dist1_start_k = 4400
+    dist0_mag = -2.0
+    dist0_start_k = 12000
+    dist1_mag = 4.0
+    dist1_start_k = 17200
 
     # Data Containers
     r_arr = np.zeros(time_steps)

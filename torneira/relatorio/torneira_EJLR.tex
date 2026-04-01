@@ -277,40 +277,60 @@ Assim, a condição de estabilidade é satisfeita, e a margem de fase efetiva do
     \Phi_m = 0.79 - 0.062 = 0.73\ \text{rad} \approx 42^\circ
 \end{equation}
 
+Abaixo está o excerto atualizado para refletir o projeto do controlador com a trajetória de malha fechada de segunda ordem (filtro de robustez), incluindo a correção dos coeficientes numéricos calculados para $T_s = 0.1$ e $\tau_\text{cl} = 18$.
+
 \subsection{Projeto do Controlador}
 
-Considerada a escolha de aproximar o sistema por um modelo de primeira ordem, e o forte ruído presente nos dados coletados para sua identificação, um controlador baseado em modelo interno é selecionado para o projeto. A principal motivação é sua robustez a imperfeições no modelo do sistema, principalmente quando comparado com controladores baseados em síntese direta \cite{Garcia1982}.
+Considerada a escolha de aproximar o sistema por um modelo de primeira ordem, e o forte ruído presente nos dados coletados para sua identificação, um controlador baseado em modelo interno é selecionado para o projeto. A principal motivação é sua robustez a imperfeições no modelo do sistema, principalmente quando comparado com controladores baseados em síntese direta \cite{Garcia1982}. Para mitigar a sensibilidade a ruídos em altas frequências e evitar uma ação de controle agressiva, adota-se uma trajetória alvo de malha fechada de segunda ordem.
 
-O modelo em \ref{eq:malha_aberta} é separado em componentes inversivel $G_-(z)$ e não inversivel $G_+(z)$, tal que
+O modelo em \ref{eq:malha_aberta} é separado em componentes inversível $G_-(z)$ e não inversível $G_+(z)$, tal que
 
 \begin{align}
     G_-(z) & = \frac{-0.004z^{-1}}{1 - 0.997z^{-1}} \\
     G_+(z) & = \frac{0.12}{1 - 0.88 z^{-1}} z^{-2}
 \end{align}
 
-O controlador ideal é obtido pela aplicação de um filtro acelerador $f(z) = \frac{1 - p}{z - p}$, com $p = e^{-\frac{2T_s}{\tau}}$, à inversa do componente inversível do sistema. Este é dado por \ref{eq:controlador_ideal}.
+O controlador ideal é obtido pela aplicação de um filtro de robustez de segunda ordem $f(z) = \frac{(1 - p)^2}{(1 - p z^{-1})^2}$, com $p = e^{-\frac{T_s}{\tau_\text{cl}}} \approx 0.9945$ -- em \ref{sec:filtro_digital}, é definido $\tau_\text{cl} = \frac{\tau}{2}$, à inversa do componente inversível do sistema. Este é dado por \ref{eq:controlador_ideal}.
 
 \begin{equation}
     \label{eq:controlador_ideal}
-    Q(z) = G_-^{-1}(z) f(z) = \frac{1 - 0.997z^{-1}}{-0.004z^{-1}} \frac{0.01}{z - 0.99}
+    Q(z) = G_-^{-1}(z) f(z) = \frac{1 - 0.997z^{-1}}{-0.004z^{-1}} \frac{(1 - p)^2}{(1 - p z^{-1})^2}
 \end{equation}
 
 Com este, o controlador implementável é dado por \ref{eq:controlador_implementavel}.
 
 \begin{align}
     C(z) & = \frac{Q(z)}{1 - Q(z) G(z)} \\
-    C(z) & = \frac{-1.4 + 2.62z^{-1} - 1.22z^{-2}}{1 - 1.87z^{-1} + 0.88z^{-2} - 0.00z^{-3}} \label{eq:controlador_implementavel}
+    C(z) & = \frac{-0.008 + 0.014z^{-1} - 0.007z^{-2}}{1 - 2.9z^{-1} + 2.74z^{-2} - 0.87z^{-3}} \label{eq:controlador_implementavel}
 \end{align}
 
 Sua implementação em equação de diferenças é dada por \ref{eq:controlador_diferencas}.
 
 \begin{align}
-    u[n] =\ & -1.4\, e[n] + 2.62\, e[n-1] - 1.22\, e[n-2] \notag \\
-           & + 1.87\, u[n-1] - 0.88\, u[n-2] + 0.00\, u[n-3]
+    u[n] =\ & -0.008\, e[n] + 0.014\, e[n-1] - 0.007\, e[n-2] \notag \\
+           & + 2.9\, u[n-1] - 2.74\, u[n-2] + 0.87\, u[n-3]
     \label{eq:controlador_diferencas}
 \end{align}
 
 \subsection{Função de Transferência de Malha Fechada}
+
+A função de transferência de malha fechada é dada por \ref{eq:malha_fechada}.
+
+\begin{equation}
+    \label{eq:malha_fechada}
+    G_\text{fechada}(z) = \frac{G(z) C(z)}{1 + G(z) H(z) M(z) C(z)}
+\end{equation}
+
+Para os modelos identificados, assumindo $M(z) \approx 1$ para $z \to 1$, a dinâmica nominal fechada resulta em \ref{eq:malha_fechada_calculada}.
+
+\begin{equation}
+    \label{eq:malha_fechada_calculada}
+    T(z) = \frac{- 0.0001 z^{-2} + 0.0001 z^{-3}}{1 - 3.9z^{-1} + 5.6z^{-2} - 3.6z^{-3} + 0.9z^{-4}}
+\end{equation}
+
+\subsubsection{Polos e Zeros}
+
+
 
 \bibliography{bibliografia}
 

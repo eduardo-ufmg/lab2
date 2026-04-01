@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 class DiscreteSystem:
@@ -38,42 +37,3 @@ class DiscreteSystem:
         y_new = self.y_op + delta_y_new
 
         return y_new
-
-
-if __name__ == "__main__":
-    # System parameters
-    K = -1.4
-    tau = 36
-    Ts = 0.1
-
-    # Operating point (Initial conditions)
-    u0 = 8.0
-    y0 = 23.0
-
-    system = DiscreteSystem(k=K, tau=tau, t_s=Ts, u_op=u0, y_op=y0)
-
-    # Simulation parameters
-    time_steps = 2000  # Extended to show steady-state convergence
-    u_values = np.zeros(time_steps)
-    y_values = np.zeros(time_steps)
-
-    u = u0  # Start with the initial input
-
-    for i in range(time_steps):
-        # Apply a step change from 8 to 2 at k=100
-        if i > 99:
-            u = 2.0
-
-        y = system.sample(u)
-
-        u_values[i] = u
-        y_values[i] = y
-
-    # Plot the results
-    plt.figure()
-    plt.plot(y_values)
-    plt.title("Step Response")
-    plt.xlabel("Time Step")
-    plt.ylabel("Absolute Amplitude")
-    plt.tight_layout()
-    plt.show()
