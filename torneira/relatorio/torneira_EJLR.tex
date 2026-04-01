@@ -115,7 +115,7 @@ A figura \ref{fig:modelo_vs_referencia} apresenta a comparação entre a respost
 
 Por analise visual, o modelo identificado foi considerado adequado.
 
-\section{Filtro Digital}
+\section{Filtro Digital}\label{sec:filtro_digital}
 
 Na resposta do sistema, é observada alta incidência de ruído impulsivo, caracterizado por perturbações pontuais de alta amplitude. Para mitigar seus efeitos, um filtro digital de mediana móvel é proposto por \cite{Geoffrine2011}. O tamanho da janela do filtro foi escolhido como $N = 5$ amostras, por experimentação. A figura \ref{fig:mediana} apresenta a comparação entre o sinal bruto e o sinal filtrado.
 
@@ -220,7 +220,97 @@ A perturbação retangular, de alta amplitude e curta duração, observada na se
 
 \section{Controlador}
 
+\subsection{Discretização do Modelo do Sistema}
 
+Discretizado por \textit{Zero-Order Hold}, o modelo do sistema é dado pela equação \ref{eq:modelo_discretizado} \cite{Aguirre2023}.
+
+\begin{equation}
+    \label{eq:modelo_discretizado}
+    G(z) = \frac{-0.0004z^{-1}}{1 - 0.997z^{-1}}
+\end{equation}
+
+Tal função de transferência relaciona a tensão fornecida ao módulo de potência, $u \in \left\{8, 2\right\}\ V$, à tensão de saída do sensor, $y \in \left\{2.0, 0.4\right\}\ V$. A relação entre a tensão de saída do sensor e a temperatura é aproximadamente linear e dada por $T = 10 \left[\frac{^\circ C}{V}\right] \times y\, ^\circ C$. Assim, a função de transferência da entrada em tensão para a saída em temperatura é dada por \ref{eq:modelo_discretizado_temperatura}.
+
+\begin{equation}
+    \label{eq:modelo_discretizado_temperatura}
+    G(z) = \frac{-0.004z^{-1}}{1 - 0.997z^{-1}}
+\end{equation}
+
+\subsection{Modelo do Filtro de Mediana Móvel}
+
+Mesmo que este não seja linear, o filtro de mediana móvel, para as condições deste projeto, pode ser aproximado por um atraso puro de tempo \cite{Geoffrine2011}, conforme \ref{eq:mediana_atraso}.
+
+\begin{equation}
+    \label{eq:mediana_atraso}
+    M(z) = z^{-2}
+\end{equation}
+
+\subsection{Função de Transferência do Sistema em Malha Aberta}
+
+A função de transferência do sistema em malha aberta é dada por \ref{eq:malha_aberta}.
+
+\begin{equation}
+    \label{eq:malha_aberta}
+    G_\text{aberta}(z) = G(z) H(z) M(z) = \frac{-0.004z^{-1}}{1 - 0.997z^{-1}} \frac{0.12}{1 - 0.88 z^{-1}} z^{-2}
+\end{equation}
+
+\subsection{Requisitos e Condições de Estabilidade}
+
+A inequação \ref{eq:condicao_estabilidade} é condição para a estabilidade do sistema em malha fechada \cite{Aguirre2023}.
+
+\begin{align}
+    \omega_\text{co} \theta_\text{eq} &\le \Phi_{m_\text{alvo}}  \label{eq:condicao_estabilidade} \\
+    \omega_\text{co} \left( \frac{M - 1}{2} + \frac{1}{1 - \alpha} \right) T_s &\le \Phi_{m_\text{alvo}}
+\end{align}
+
+Para a constante de tempo alvo definida em \ref{sec:filtro_digital}, a frequência de \textit{crossover} é dada por $f_\text{co} \approx 0.06 \text{Hz}$. Conservadoramente, a margem de fase escolhida é de $\Phi_{m_\text{alvo}} = 45^\circ = \frac{\pi}{4}\ \text{rad}$. Dos valores sintonizados em \ref{sec:filtro_digital},
+
+\begin{equation}
+    \label{eq:condicao_estabilidate_satisfeita}
+    0.062 \le 0.79
+\end{equation}
+
+Assim, a condição de estabilidade é satisfeita, e a margem de fase efetiva do sistema é
+
+\begin{equation}
+    \label{eq:margem_fase}
+    \Phi_m = 0.79 - 0.062 = 0.73\ \text{rad} \approx 42^\circ
+\end{equation}
+
+\subsection{Projeto do Controlador}
+
+Considerada a escolha de aproximar o sistema por um modelo de primeira ordem, e o forte ruído presente nos dados coletados para sua identificação, um controlador baseado em modelo interno é selecionado para o projeto. A principal motivação é sua robustez a imperfeições no modelo do sistema, principalmente quando comparado com controladores baseados em síntese direta \cite{Garcia1982}.
+
+O modelo em \ref{eq:malha_aberta} é separado em componentes inversivel $G_-(z)$ e não inversivel $G_+(z)$, tal que
+
+\begin{align}
+    G_-(z) & = \frac{-0.004z^{-1}}{1 - 0.997z^{-1}} \\
+    G_+(z) & = \frac{0.12}{1 - 0.88 z^{-1}} z^{-2}
+\end{align}
+
+O controlador ideal é obtido pela aplicação de um filtro acelerador $f(z) = \frac{1 - p}{z - p}$, com $p = e^{-\frac{2T_s}{\tau}}$, à inversa do componente inversível do sistema. Este é dado por \ref{eq:controlador_ideal}.
+
+\begin{equation}
+    \label{eq:controlador_ideal}
+    Q(z) = G_-^{-1}(z) f(z) = \frac{1 - 0.997z^{-1}}{-0.004z^{-1}} \frac{0.01}{z - 0.99}
+\end{equation}
+
+Com este, o controlador implementável é dado por \ref{eq:controlador_implementavel}.
+
+\begin{align}
+    C(z) & = \frac{Q(z)}{1 - Q(z) G(z)} \\
+    C(z) & = \frac{-1.4 + 2.62z^{-1} - 1.22z^{-2}}{1 - 1.87z^{-1} + 0.88z^{-2} - 0.00z^{-3}} \label{eq:controlador_implementavel}
+\end{align}
+
+Sua implementação em equação de diferenças é dada por \ref{eq:controlador_diferencas}.
+
+\begin{align}
+    u[n] =\ & -1.4\, e[n] + 2.62\, e[n-1] - 1.22\, e[n-2] \notag \\
+           & + 1.87\, u[n-1] - 0.88\, u[n-2] + 0.00\, u[n-3]
+    \label{eq:controlador_diferencas}
+\end{align}
+
+\subsection{Função de Transferência de Malha Fechada}
 
 \bibliography{bibliografia}
 
