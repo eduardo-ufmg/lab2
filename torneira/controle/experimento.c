@@ -14,14 +14,28 @@
 
 #define SAMPLING_PERIOD_SEC 0.1
 #define SAMPLES_PER_SECOND (1.0 / SAMPLING_PERIOD_SEC)
-#define N_SAMPLES 5400
+#define N_SAMPLES 9000            /* 15 minutes at 10 Hz */
+#define WAIT_TIMEOUT_SAMPLES 3000 /* 5 minutes maximum wait time */
 #define RT_PRIORITY 90
+
+/* System Constants */
+#define OP_U 8.0
+#define OP_Y 23.0
+#define SENSOR_GAIN 10.0
 
 /* Filter Parameters */
 #define MEDIAN_SAMPLES 5
 #define ALPHA 0.88
 
-/* Thread-safe error handling macro */
+/* Controller Parameters */
+#define CTRL_NUM_1 -0.007772
+#define CTRL_NUM_2 0.01459
+#define CTRL_NUM_3 -0.006819
+
+#define CTRL_DEN_1 2.869
+#define CTRL_DEN_2 -2.739
+#define CTRL_DEN_3 0.8702
+
 #define DAQmxErrChk(functionCall)                                                                  \
     do {                                                                                           \
         int32 error = (functionCall);                                                              \
@@ -33,20 +47,26 @@
         }                                                                                          \
     } while (0)
 
+typedef enum { SYSTEM_STATE_WAIT_OP, SYSTEM_STATE_CONTROL } system_state_t;
+
 typedef struct
 {
-    int k;
-    float64 u;
-    float64 y_raw;
+    float64 ref;
     float64 y_hat;
+    float64 u;
 } sample_t;
 
 typedef struct
 {
     float64 y_hist[MEDIAN_SAMPLES];
     float64 y_hat_prev;
-    int is_initialized;
 } filter_state_t;
+
+typedef struct
+{
+    float64 u_hist[3];
+    float64 e_hist[3];
+} controller_state_t;
 
 static inline void filter_init(filter_state_t * f)
 {
@@ -58,13 +78,11 @@ static inline float64 filter_update(filter_state_t * f, float64 y_n)
 {
     float64 temp_hist[MEDIAN_SAMPLES];
 
-    /* Shift history register */
     for (int i = MEDIAN_SAMPLES - 1; i > 0; --i) {
         f->y_hist[i] = f->y_hist[i - 1];
     }
     f->y_hist[0] = y_n;
 
-    /* Copy and sort for median extraction (Inline Insertion Sort) */
     memcpy(temp_hist, f->y_hist, sizeof(temp_hist));
     for (int i = 1; i < MEDIAN_SAMPLES; i++) {
         float64 key = temp_hist[i];
@@ -77,18 +95,46 @@ static inline float64 filter_update(filter_state_t * f, float64 y_n)
     }
 
     float64 x_n = temp_hist[MEDIAN_SAMPLES / 2];
+    float64 y_hat_volts = ALPHA * f->y_hat_prev + (1.0 - ALPHA) * x_n;
 
-    /* Exponential Moving Average (EMA) */
-    float64 y_hat = ALPHA * f->y_hat_prev + (1.0 - ALPHA) * x_n;
+    f->y_hat_prev = y_hat_volts;
 
-    f->y_hat_prev = y_hat;
-    return y_hat;
+    /* Return strictly in voltage domain */
+    return y_hat_volts;
 }
 
-/* Global state: locked in RAM via mlockall */
+static inline void controller_init(controller_state_t * c, float64 u0, float64 e0)
+{
+    for (int i = 0; i < 3; ++i) {
+        c->u_hist[i] = u0;
+        c->e_hist[i] = e0;
+    }
+}
+
+static inline float64 controller_update(controller_state_t * c, float64 e_n)
+{
+    float64 u_k = CTRL_DEN_1 * c->u_hist[0] + CTRL_DEN_2 * c->u_hist[1] +
+                  CTRL_DEN_3 * c->u_hist[2] + CTRL_NUM_1 * c->e_hist[0] +
+                  CTRL_NUM_2 * c->e_hist[1] + CTRL_NUM_3 * c->e_hist[2];
+
+    c->u_hist[2] = c->u_hist[1];
+    c->u_hist[1] = c->u_hist[0];
+    c->u_hist[0] = u_k;
+
+    c->e_hist[2] = c->e_hist[1];
+    c->e_hist[1] = c->e_hist[0];
+    c->e_hist[0] = e_n;
+
+    return u_k;
+}
+
+/* Global state */
 TaskHandle AItaskHandle = 0;
 TaskHandle AOtaskHandle = 0;
 sample_t record_buffer[N_SAMPLES];
+volatile int32 rt_error_code = 0;
+volatile int samples_recorded = 0;
+volatile int timeout_flag = 0;
 
 static int init_board(void)
 {
@@ -100,11 +146,10 @@ static int init_board(void)
     DAQmxErrChk(
         DAQmxCreateAOVoltageChan(AOtaskHandle, "Dev1/ao0", "", -10.0, 10.0, DAQmx_Val_Volts, NULL));
 
-    /* Configure for Hardware Timed Single Point (HWTSP) */
     DAQmxErrChk(DAQmxCfgSampClkTiming(AItaskHandle, "", SAMPLES_PER_SECOND, DAQmx_Val_Rising,
                                       DAQmx_Val_HWTimedSinglePoint, 1));
-    DAQmxErrChk(DAQmxCfgSampClkTiming(AOtaskHandle, "", SAMPLES_PER_SECOND, DAQmx_Val_Rising,
-                                      DAQmx_Val_HWTimedSinglePoint, 1));
+    DAQmxErrChk(DAQmxCfgSampClkTiming(AOtaskHandle, "ai/SampleClock", SAMPLES_PER_SECOND,
+                                      DAQmx_Val_Rising, DAQmx_Val_HWTimedSinglePoint, 1));
 
     DAQmxErrChk(
         DAQmxSetRealTimeWaitForNextSampClkWaitMode(AItaskHandle, DAQmx_Val_WaitForInterrupt));
@@ -133,49 +178,92 @@ void * control_loop_task(void * arg)
 {
     (void)arg;
     float64 data_read = 0.0;
-    float64 data_write = 8.0;
+    float64 data_write = OP_U; /* Initialize output to OP immediately */
+    int32 err = 0;
 
     filter_state_t state_estimator;
     filter_init(&state_estimator);
 
-    for (int sample_ctr = 0; sample_ctr < N_SAMPLES; ++sample_ctr) {
+    controller_state_t controller;
 
-        /* Control law / Trajectory generation */
-        if (sample_ctr > 3600) {
-            data_write = 8.0;
-        } else if (sample_ctr > 1800) {
-            data_write = 2.0;
-        }
+    system_state_t current_state = SYSTEM_STATE_WAIT_OP;
+    unsigned op_counter = 0;
+    unsigned wait_timeout_counter = 0;
 
-        /* 1. Write DAC (buffered for next clock edge) */
-        int32 err = DAQmxWriteAnalogScalarF64(AOtaskHandle, 1, 10.0, data_write, NULL);
+    while (1) {
+        /* 1. Write DAC (Buffered for next edge) */
+        err = DAQmxWriteAnalogScalarF64(AOtaskHandle, 1, 10.0, data_write, NULL);
         if (DAQmxFailed(err)) {
-            fprintf(stderr, "RT Loop AO Write Failed: %d\n", err);
+            rt_error_code = err;
             break;
         }
 
-        /* 2. Block until hardware sample clock edge */
+        /* 2. Wait for HW Edge */
         err = DAQmxWaitForNextSampleClock(AItaskHandle, 10.0, NULL);
         if (DAQmxFailed(err)) {
-            fprintf(stderr, "RT Loop Wait For Clock Failed: %d\n", err);
+            rt_error_code = err;
             break;
         }
 
-        /* 3. Read ADC (latched at clock edge) */
+        /* 3. Read ADC */
         err = DAQmxReadAnalogScalarF64(AItaskHandle, 10.0, &data_read, NULL);
         if (DAQmxFailed(err)) {
-            fprintf(stderr, "RT Loop AI Read Failed: %d\n", err);
+            rt_error_code = err;
             break;
         }
 
-        /* 4. Update Filter */
-        float64 y_hat = filter_update(&state_estimator, data_read);
+        /* 4. Filter and Scale */
+        float64 y_hat_volts = filter_update(&state_estimator, data_read);
+        float64 y_hat_celsius = y_hat_volts * SENSOR_GAIN;
 
-        /* 5. Log state to pre-allocated RAM */
-        record_buffer[sample_ctr].k = sample_ctr;
-        record_buffer[sample_ctr].u = data_write;
-        record_buffer[sample_ctr].y_raw = data_read;
-        record_buffer[sample_ctr].y_hat = y_hat;
+        /* 5. State Machine Evaluation */
+        if (current_state == SYSTEM_STATE_WAIT_OP) {
+
+            data_write = OP_U;
+
+            if (fabs(y_hat_celsius - OP_Y) < 0.5) {
+                op_counter++;
+            } else {
+                op_counter = 0;
+            }
+
+            wait_timeout_counter++;
+            if (wait_timeout_counter >= WAIT_TIMEOUT_SAMPLES) {
+                timeout_flag = 1;
+                break;
+            }
+
+            if (op_counter >= 50) {
+                /* Bumpless transfer initialization */
+                controller_init(&controller, OP_U, 0.0);
+                current_state = SYSTEM_STATE_CONTROL;
+            }
+
+        } else if (current_state == SYSTEM_STATE_CONTROL) {
+
+            float64 ref = 0.0;
+            if (samples_recorded > 3600) {
+                ref = 25.0;
+            } else if (samples_recorded > 1800) {
+                ref = 30.0;
+            } else {
+                ref = 23.0;
+            }
+
+            float64 error = ref - y_hat_celsius;
+            data_write = controller_update(&controller, error);
+
+            /* Log state */
+            record_buffer[samples_recorded].ref = ref;
+            record_buffer[samples_recorded].y_hat = y_hat_celsius;
+            record_buffer[samples_recorded].u = data_write;
+
+            samples_recorded++;
+
+            if (samples_recorded >= N_SAMPLES) {
+                break; /* Target completed */
+            }
+        }
     }
 
     return NULL;
@@ -187,19 +275,16 @@ int main(void)
     pthread_attr_t attr;
     pthread_t thread;
 
-    /* Initialize hardware and evaluate return constraint */
     if (init_board() < 0) {
         fprintf(stderr, "Hardware initialization failed. Aborting.\n");
         return EXIT_FAILURE;
     }
 
-    /* Lock process memory to prevent page faults */
     if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1) {
         perror("mlockall failed");
         goto cleanup;
     }
 
-    /* Configure real-time thread attributes */
     if (pthread_attr_init(&attr)) {
         perror("pthread_attr_init failed");
         goto cleanup;
@@ -211,7 +296,6 @@ int main(void)
     param.sched_priority = RT_PRIORITY;
     pthread_attr_setschedparam(&attr, &param);
 
-    /* Execute real-time task */
     if (pthread_create(&thread, &attr, control_loop_task, NULL)) {
         perror("pthread_create failed");
         goto cleanup;
@@ -219,16 +303,23 @@ int main(void)
 
     pthread_join(thread, NULL);
 
-    /* Post-execution disk I/O dump */
+    if (timeout_flag) {
+        fprintf(stderr, "Experiment aborted: Operating point not reached within timeout period.\n");
+    }
+
+    if (rt_error_code != 0) {
+        char errBuff[2048] = {'\0'};
+        DAQmxGetExtendedErrorInfo(errBuff, 2048);
+        fprintf(stderr, "Real-time task aborted with DAQmx Error [%d]: %s\n", rt_error_code,
+                errBuff);
+    }
+
     FILE * exp_data_f = fopen("experimento.txt", "w");
     if (exp_data_f) {
-        fprintf(exp_data_f, "k, u, y_raw, y_hat\n");
-        for (int i = 0; i < N_SAMPLES; ++i) {
-            /* Only write valid samples if loop terminated early */
-            if (i > 0 && record_buffer[i].k == 0 && record_buffer[i].u == 0.0)
-                break;
-            fprintf(exp_data_f, "%d, %lf, %lf, %lf\n", record_buffer[i].k, record_buffer[i].u,
-                    record_buffer[i].y_raw, record_buffer[i].y_hat);
+        fprintf(exp_data_f, "ref, y_hat, u\n");
+        for (int i = 0; i < samples_recorded; ++i) {
+            fprintf(exp_data_f, "%lf, %lf, %lf\n", record_buffer[i].ref, record_buffer[i].y_hat,
+                    record_buffer[i].u);
         }
         fclose(exp_data_f);
     } else {
@@ -245,5 +336,5 @@ cleanup:
         DAQmxClearTask(AOtaskHandle);
     }
 
-    return EXIT_SUCCESS;
+    return (rt_error_code == 0 && timeout_flag == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

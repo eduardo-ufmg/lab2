@@ -277,8 +277,6 @@ Assim, a condição de estabilidade é satisfeita, e a margem de fase efetiva do
     \Phi_m = 0.79 - 0.062 = 0.73\ \text{rad} \approx 42^\circ
 \end{equation}
 
-Abaixo está o excerto atualizado para refletir o projeto do controlador com a trajetória de malha fechada de segunda ordem (filtro de robustez), incluindo a correção dos coeficientes numéricos calculados para $T_s = 0.1$ e $\tau_\text{cl} = 18$.
-
 \subsection{Projeto do Controlador}
 
 Considerada a escolha de aproximar o sistema por um modelo de primeira ordem, e o forte ruído presente nos dados coletados para sua identificação, um controlador baseado em modelo interno é selecionado para o projeto. A principal motivação é sua robustez a imperfeições no modelo do sistema, principalmente quando comparado com controladores baseados em síntese direta \cite{Garcia1982}. Para mitigar a sensibilidade a ruídos em altas frequências e evitar uma ação de controle agressiva, adota-se uma trajetória alvo de malha fechada de segunda ordem.
@@ -325,12 +323,48 @@ Para os modelos identificados, assumindo $M(z) \approx 1$ para $z \to 1$, a din�
 
 \begin{equation}
     \label{eq:malha_fechada_calculada}
-    T(z) = \frac{- 0.0001 z^{-2} + 0.0001 z^{-3}}{1 - 3.9z^{-1} + 5.6z^{-2} - 3.6z^{-3} + 0.9z^{-4}}
+    T(z) = \frac{3.038 \times 10^{-5} z^{-2} - 8.375 \times 10^{-5} z^{-3} + 7.683 \times 10^{-5} z^{-4} - 2.345 \times 10^{-5} z^{-5} }{1 - 4.746 z^{-1} + 9.002 z^{-2} - 8.53 z^{-3} + 4.037 z^{-4} - 0.7637 z^{-5}}
 \end{equation}
 
 \subsubsection{Polos e Zeros}
 
+Os polos e zeros de \ref{eq:malha_fechada_calculada} são
 
+\begin{align}
+    \text{Polos}:& \{0.99657 \pm 0.001j, 0.993, 0.88, 0.879\} \\
+    \text{Zeros}:& \{0.997, 0.88 \pm 4.12e-8j\}
+\end{align}
+
+Tal resultado é condizente com a estratégia de projeto de controlador adotada, baseada em cancelamento de polos e zeros. Os polos próximos a $z = 1$ proporcionam a integração necessária para o rastreamento de referência em degrau, enquanto os polos complexos conjugados próximos a $z = 0.88$ correspondem à tratativa da dinâmica do filtro digital. A figura \ref{fig:polos_zeros_malha_fechada} apresenta a localização dos polos e zeros no plano complexo.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../controle/polos_zeros_malha_fechada.png}
+    \caption{Polos e zeros da função de transferência de malha fechada.}
+    \label{fig:polos_zeros_malha_fechada}
+\end{figure}
+
+A proxímidade entre alguns zeros e polos pode sugerir a simplificação da função de malha fechada, por meio de cancelamento de polos e zeros próximos. No entanto, \ref{fig:comparacao_resposta_degrau} mostra diferenças significativas na dinâmica para a resposta ao degrau, o que evidencia os efeitos de tais polos e zeros.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../controle/comparacao_resposta_degrau.png}
+    \caption{Comparação entre a resposta ao degrau da função de transferência de malha fechada calculada e a função de transferência de malha fechada simplificada por meio de cancelamento de polos e zeros próximos.}
+    \label{fig:comparacao_resposta_degrau}
+\end{figure}
+
+\subsection{Simulação}
+
+Para a simulação, \ref{eq:modelo_discretizado_temperatura}, \ref{eq:filtro_sintonizado} e \ref{eq:controlador_implementavel} são implementados em equações de diferenças. Um vetor de referência e um vetor de perturbação de temperatura são definidos, e a resposta do sistema em malha fechada é calculada por meio de simulação iterativa. A figura \ref{fig:resposta_malha_fechada} apresenta a resposta do sistema em malha fechada à condição simulada.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../controle/resposta_malha_fechada.png}
+    \caption{Resposta do sistema em malha fechada à condição simulada.}
+    \label{fig:resposta_malha_fechada}
+\end{figure}
+
+Nesta, são evidenciadas a capacidade de rastreamento da referência, a rejeição de perturbações, e a suavidade da ação de controle.
 
 \bibliography{bibliografia}
 

@@ -1,10 +1,14 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+from typing import cast
 
-from discrete_system import DiscreteSystem
+import control
+import matplotlib.pyplot as plt
+import numpy as np
+from control import TransferFunction
+from matplotlib.patches import Circle
+
+from digital_controller import DigitalController
 from digital_filter import DigitalFilter
-from digital_controler import DigitalController
+from discrete_system import DiscreteSystem
 
 # -----------------------------------------------------------------------------
 # 2. Closed-Loop Integration & Validation
@@ -20,7 +24,7 @@ if __name__ == "__main__":
     y0 = 23.0
 
     # Instantiate Components
-    plant = DiscreteSystem(k=K, tau=tau, t_s=Ts, u_op=u0, y_op=y0)
+    plant = DiscreteSystem(K=K, tau=tau, Ts=Ts, u_op=u0, y_op=y0)
     controller = DigitalController(T_s=Ts, tau_cl=tau / 2)
     digital_filter = DigitalFilter()
 
@@ -129,3 +133,78 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     plt.savefig("resposta_malha_fechada.png")
+
+    # -------------------------------------------------------------------------
+    # 5. Closed-Loop Poles and Zeros
+    # -------------------------------------------------------------------------
+    G = plant.get_tf()
+    F = digital_filter.get_tf()
+    C = controller.get_tf()
+
+    print(f"Função de Transferência do Sistema Discretizado:\n{G}\n")
+    print(f"Função de Transferência do Filtro Digital:\n{F}\n")
+    print(f"Função de Transferência do Controlador Digital:\n{C}\n")
+
+    L = C * G
+    closed_loop_tf = cast(TransferFunction, control.feedback(L, F))  # type: ignore can you believe sys2 is hinted as strictly int?
+
+    print(f"Função de Transferência em Malha Fechada:\n{closed_loop_tf}\n")
+
+    poles = closed_loop_tf.poles()
+    zeros = closed_loop_tf.zeros()
+
+    print(f"Polos do Sistema em Malha Fechada: {poles}")
+    print(f"Zeros do Sistema em Malha Fechada: {zeros}")
+
+    plt.figure()
+    plt.scatter(np.real(poles), np.imag(poles), marker="x", color="red", label="Polos")
+    plt.scatter(np.real(zeros), np.imag(zeros), marker="o", color="blue", label="Zeros")
+    plt.gca().add_patch(
+        Circle(
+            (0, 0),
+            1,
+            color="black",
+            fill=False,
+            linestyle="--",
+            label="Limite de Estabilidade (|z|=1)",
+        )
+    )
+    plt.title("Polos e Zeros do Sistema em Malha Fechada")
+    plt.xlabel("$\\mathbb{R}$")
+    plt.ylabel("$\\mathbb{I}$")
+    plt.xlim(np.min(np.real(poles)) - 0.01, np.max(np.real(poles)) + 0.01)
+    plt.ylim(np.min(np.imag(poles)) - 0.01, np.max(np.imag(poles)) + 0.01)
+    plt.grid()
+    plt.legend()
+    plt.savefig("polos_zeros_malha_fechada.png")
+
+    # -------------------------------------------------------------------------
+    # 6. Simplified Closed-Loop Transfer Function
+    # -------------------------------------------------------------------------
+    snum = [0.01 / 1.4]
+    sden = [1, -0.993]
+
+    S = control.TransferFunction(snum, sden, dt=Ts)
+
+    tstep = t[:2000]  # Simulate for the first 200 seconds
+
+    _, sresponse = control.step_response(S, T=tstep)
+    _, tresponse = control.step_response(closed_loop_tf, T=tstep)
+
+    plt.figure()
+    plt.plot(
+        tstep,
+        cast(np.ndarray, sresponse),
+        label="Resposta ao Degrau do Sistema Simplificado",
+    )
+    plt.plot(
+        tstep,
+        cast(np.ndarray, tresponse),
+        label="Resposta ao Degrau do Sistema em Malha Fechada",
+    )
+    plt.title("Comparação de Respostas ao Degrau")
+    plt.xlabel("Tempo (s)")
+    plt.ylabel("Amplitude")
+    plt.grid()
+    plt.legend()
+    plt.savefig("comparacao_resposta_degrau.png")

@@ -1,11 +1,11 @@
 import numpy as np
-
 from data_io import (
-    load_experiment_data,
-    plot_filter,
-    load_model_predictions,
     compare_residuals,
+    load_experiment_data,
+    load_model_predictions,
+    plot_filter,
 )
+
 from digital_filter import DigitalFilter
 
 

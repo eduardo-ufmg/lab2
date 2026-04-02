@@ -1,7 +1,7 @@
-import numpy as np
-
 from collections import deque
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass

@@ -1,3 +1,4 @@
+import control
 import numpy as np
 
 
@@ -7,13 +8,17 @@ class DiscreteSystem:
     the continuous ZOH equivalent of G(s) = K / (tau*s + 1).
     """
 
-    def __init__(self, k: float, tau: float, t_s: float, u_op: float, y_op: float):
+    def __init__(self, Ts: float, K: float, tau: float, u_op: float, y_op: float):
+        self.Ts = Ts
         self.u_op = u_op
         self.y_op = y_op
 
         # Exact ZOH coefficient calculation
-        self.a1 = np.exp(-t_s / tau)
-        self.b1 = k * (1.0 - self.a1)
+        self.a1 = np.exp(-Ts / tau)
+        self.b1 = K * (1.0 - self.a1)
+
+        self.num = [self.b1]
+        self.den = [1.0, -self.a1]
 
         # State registers (deviation variables)
         self.delta_y_prev = 0.0
@@ -37,3 +42,6 @@ class DiscreteSystem:
         y_new = self.y_op + delta_y_new
 
         return y_new
+
+    def get_tf(self) -> control.TransferFunction:
+        return control.TransferFunction(self.num, self.den, dt=self.Ts)

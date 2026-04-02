@@ -1,5 +1,7 @@
-import warnings
 import math
+import warnings
+
+import control
 
 
 class DigitalController:
@@ -12,11 +14,11 @@ class DigitalController:
     def __init__(
         self, tau_cl: float, T_s: float, u_min: float = 2.0, u_max: float = 8.0
     ):
+
+        self.Ts = T_s
+
         self.u_min = u_min
         self.u_max = u_max
-
-        # Calculate parameter p and analytical coefficients
-        p = math.exp(-T_s / tau_cl)
 
         # Calculate parameter alpha for a critically damped second-order target
         alpha = math.exp(-T_s / tau_cl)
@@ -32,6 +34,9 @@ class DigitalController:
         self.a1 = 2.0 * alpha + 0.88
         self.a2 = -(alpha_sq + 1.76 * alpha)
         self.a3 = alpha_sq - 0.24 * alpha + 0.12
+
+        self.num = [self.b0, self.b1, self.b2]
+        self.den = [1.0, -self.a1, -self.a2, -self.a3]
 
         # Past error states: e[n-1], e[n-2]
         self.e_1 = 0.0
@@ -99,3 +104,7 @@ class DigitalController:
         self.u_1 = u_new
 
         return u_new
+
+    def get_tf(self) -> control.TransferFunction:
+        """Return the transfer function representation of the digital controller."""
+        return control.TransferFunction(self.num, self.den, dt=self.Ts)
