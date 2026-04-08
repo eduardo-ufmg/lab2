@@ -360,7 +360,7 @@ int main(void)
                 errBuff);
     }
 
-    FILE * exp_data_f = fopen("experimento.txt", "w");
+    FILE * exp_data_f = fopen("experimento_pi.txt", "w");
     if (exp_data_f) {
         fprintf(exp_data_f, "ref, y_hat, u\n");
         for (int i = 0; i < samples_recorded; ++i) {

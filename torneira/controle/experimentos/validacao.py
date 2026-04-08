@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
+EXPERIMENT_NAME = "pi"  # Change to "imc" for the IMC experiment
+
 
 def main():
-    df = pd.read_csv("pi.txt")
+    df = pd.read_csv(f"experimento_{EXPERIMENT_NAME}.txt")
     df.columns = df.columns.str.strip()
     ref, y_hat, u = df["ref"], df["y_hat"], df["u"]
 
@@ -23,7 +25,7 @@ def main():
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    plt.savefig("experimento_pi.png")
+    plt.savefig(f"experimento_{EXPERIMENT_NAME}.png")
 
 
 if __name__ == "__main__":
