@@ -366,6 +366,47 @@ Para a simulação, \ref{eq:modelo_discretizado_temperatura}, \ref{eq:filtro_sin
 
 Nesta, são evidenciadas a capacidade de rastreamento da referência, a rejeição de perturbações, e a suavidade da ação de controle.
 
+\section{Validação do Controlador em Experimentos}
+
+Para sua validação, o controlador é implementado no sistema em tempo real, e um experimento é conduzido. A figura \ref{fig:experimento_inicial} mostra o comportamento do sistema neste experimento.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../controle/experimentos/experimento_inicial.png}
+    \caption{Comportamento do sistema durante o primeiro experimento de validação do controlador.}
+    \label{fig:experimento_inicial}
+\end{figure}
+
+Nesta, é evidente a incoerência entre o comportamento esperado e o comportamento observado. Outras sintonias do controlador foram testadas, mas o comportamento observado permaneceu incoerente.
+
+Como teste de sanidade, um \textbf{PI} simples foi projetado e sintonizado em
+
+\begin{align}
+    K_p &= -\frac{\Delta{}u_\text{desejado}}{\Delta{}y_\text{desejado}}= -\frac{8 - 2}{29 - 25} = -1.5 \\
+    T_i & = \tau \text{fator\_aceleração} = 30 \times 0.8 = 24
+\end{align}
+
+Sua implementação em equação de diferenças é dada por \ref{eq:pi_diferencas}.
+
+\begin{equation}
+    \begin{aligned}
+        u[n] &= (-1.5 + \frac{-1.5}{24} 0.1) e[n] + 1.5 e[n-1] + u[n-1] \\
+        u[n] &= max(min(8, u[n]), 2)
+    \end{aligned}
+    \label{eq:pi_diferencas}
+\end{equation}
+
+O comportamento do sistema com o controlador PI é apresentado na figura \ref{fig:experimento_pi}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../controle/experimentos/experimento_pi.png}
+    \caption{Comportamento do sistema durante o experimento de validação do controlador PI.}
+    \label{fig:experimento_pi}
+\end{figure}
+
+Apesar da resposta ainda oscilatória, é percebida a tendência de rastreamento da referência, o que sugere que o controlador PI é capaz de controlar o sistema e pode ser sintonizado para alcançar uma performance satisfatória. Assim, a incoerência observada com o controlador baseado em modelo interno é atribuída a erros de projeto ou implementação. Antes da retomada do projeto do controlador baseado em modelo interno, o controlador PI é mantido para aprimoramentos e experimentos adicionais.
+
 \bibliography{bibliografia}
 
 \end{document}

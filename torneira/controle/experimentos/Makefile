@@ -1,9 +1,8 @@
-# Makefile for building experimento.c (NI-DAQmx + GSL)
+# Makefile for building imc.c and pi.c (NI-DAQmx + GSL)
 #
 # Usage:
-#   make                # build
+#   make                # build both imc and pi
 #   make clean          # remove build artifacts
-#   make run            # build + run (requires sudo for realtime/DAQ hardware)
 #
 # Override any of these variables on the command line, e.g.:
 #   make CC=clang CFLAGS="-O2 -g" NIDAQMX_LIB=/opt/natinst/lib
@@ -32,25 +31,20 @@ LDFLAGS += -L$(NIDAQMX_LIB)
 LDLIBS += -lnidaqmx -lpthread -lm $(GSL_LIBS)
 
 # Targets
-TARGET ?= experimento
-SRC := experimento.c
-OBJ := $(SRC:.c=.o)
+.PHONY: all clean info
+all: imc pi
 
-.PHONY: all clean run info
-all: $(TARGET)
+imc: imc.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-$(TARGET): $(OBJ)
+pi: pi.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(OBJ) $(TARGET)
-
-run: all
-	@echo "---- Running $(TARGET) (may require sudo for real-time scheduling / DAQ access) ----"
-	sudo ./$(TARGET)
+	rm -f imc pi imc.o pi.o
 
 info:
 	@echo "CC = $(CC)"

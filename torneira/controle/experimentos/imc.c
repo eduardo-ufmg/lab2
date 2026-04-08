@@ -111,7 +111,7 @@ static inline void controller_init(controller_state_t * c, float64 u0, float64 e
     }
 }
 
-static inline float64 controller_update(controller_state_t * c, float64 e_n)
+static inline float64 controller_update_euler(controller_state_t * c, float64 e_n)
 {
     float64 u_k = CTRL_DEN_1 * c->u_hist[0] + CTRL_DEN_2 * c->u_hist[1] +
                   CTRL_DEN_3 * c->u_hist[2] + CTRL_NUM_1 * c->e_hist[0] +
@@ -251,7 +251,7 @@ void * control_loop_task(void * arg)
             }
 
             float64 error = ref - y_hat_celsius;
-            data_write = controller_update(&controller, error);
+            data_write = controller_update_euler(&controller, error);
 
             /* Log state */
             record_buffer[samples_recorded].ref = ref;
