@@ -6,7 +6,7 @@ import numpy as np
 from control import TransferFunction
 from matplotlib.patches import Circle
 
-from digital_controller import DigitalController
+from digital_controller import DigitalControllerIMC, DigitalControllerPI
 from digital_filter import DigitalFilter
 from discrete_system import DiscreteSystem
 
@@ -23,21 +23,30 @@ if __name__ == "__main__":
     u0 = 8.0
     y0 = 23.0
 
-    # Instantiate Components
-    plant = DiscreteSystem(K=K, tau=tau, Ts=Ts, u_op=u0, y_op=y0)
-    controller = DigitalController(T_s=Ts, tau_cl=tau / 2)
-    digital_filter = DigitalFilter()
+    # Instantiate Components for the IMC simulation
+    plantIMC = DiscreteSystem(K=K, tau=tau, Ts=Ts, u_op=u0, y_op=y0)
+    controllerIMC = DigitalControllerIMC(tau_cl=tau / 2, T_s=Ts)
+    dfIMC = DigitalFilter()
+
+    # Instantiate Components for the PI simulation
+    plantPI = DiscreteSystem(K=K, tau=tau, Ts=Ts, u_op=u0, y_op=y0)
+    controllerPI = DigitalControllerPI(Kp=-1.5, Ti=24.0, T_s=Ts)
+    dfPI = DigitalFilter()
 
     # Initialization / Bumpless Transfer Preparation
     # 1. Pre-fill filter buffers to the steady-state operating point
-    for _ in range(digital_filter.median_window_size + 1):
-        digital_filter.filter(y0)
+    for _ in range(dfIMC.median_window_size + 1):
+        dfIMC.filter(y0)
+        dfPI.filter(y0)
 
     # 2. Pre-fill controller history explicitly
-    controller.set_auto(False)
+    controllerIMC.set_auto(False)
+    controllerPI.set_auto(False)
     for _ in range(3):
-        controller.update_memory(u=u0, e=0.0)
-    controller.set_auto(True)
+        controllerIMC.update_memory(u=u0, e=0.0)
+        controllerPI.update_memory(u=u0, e=0.0)
+    controllerIMC.set_auto(True)
+    controllerPI.set_auto(True)
 
     # Simulation Setup
     time_steps = 24000
@@ -57,14 +66,26 @@ if __name__ == "__main__":
 
     # Data Containers
     r_arr = np.zeros(time_steps)
-    y_meas_arr = np.zeros(time_steps)
-    y_hat_arr = np.zeros(time_steps)
-    u_arr = np.zeros(time_steps)
-    e_arr = np.zeros(time_steps)
 
-    # Initial State Iteration
-    y_true = y0
-    u_curr = u0
+    # IMC Data Containers
+    ymeasIMC_arr = np.zeros(time_steps)
+    yhatIMC_arr = np.zeros(time_steps)
+    uIMC_arr = np.zeros(time_steps)
+    eIMC_arr = np.zeros(time_steps)
+
+    # PI Data Containers
+    ymeasPI_arr = np.zeros(time_steps)
+    yhatPI_arr = np.zeros(time_steps)
+    uPI_arr = np.zeros(time_steps)
+    ePI_arr = np.zeros(time_steps)
+
+    # Initial IMC State Iteration
+    yIMC = y0
+    uIMC = u0
+
+    # Initial PI State Iteration
+    yPI = y0
+    uPI = u0
 
     r = y0  # Initial setpoint
 
@@ -79,32 +100,47 @@ if __name__ == "__main__":
 
         # 1. Plant physical output (true state)
         if k > 0:
-            y_true = plant.sample(u_curr)
+            yIMC = plantIMC.sample(uIMC)
+            yPI = plantPI.sample(uPI)
 
         # 2. Add disturbance
         if dist0_start_k <= k:
-            y_true += dist0_mag
+            yIMC += dist0_mag
+            yPI += dist0_mag
         if dist1_start_k <= k:
-            y_true += dist1_mag
+            yIMC += dist1_mag
+            yPI += dist1_mag
 
         # 3. Sensor measurement with additive Gaussian noise
-        y_meas = y_true + np.random.normal(0, noise_std)
+        ymeasIMC = yIMC + np.random.normal(0, noise_std)
+        ymeasPI = yPI + np.random.normal(0, noise_std)
 
         # 4. Filtering pipeline
-        y_hat = digital_filter.filter(y_meas)
+        yhatIMC = dfIMC.filter(ymeasIMC)
+        yhatPI = dfPI.filter(ymeasPI)
 
         # 5. Error computation
-        e = r - y_hat
+        eIMC = r - yhatIMC
+        ePI = r - yhatPI
 
         # 6. Controller output
-        u_curr = controller.compute(e)
+        uIMC = controllerIMC.compute(eIMC)
+        uPI = controllerPI.compute(ePI)
 
         # Log Data
         r_arr[k] = r
-        y_meas_arr[k] = y_meas
-        y_hat_arr[k] = y_hat
-        u_arr[k] = u_curr
-        e_arr[k] = e
+
+        # IMC Data Logging
+        ymeasIMC_arr[k] = ymeasIMC
+        yhatIMC_arr[k] = yhatIMC
+        uIMC_arr[k] = uIMC
+        eIMC_arr[k] = eIMC
+
+        # PI Data Logging
+        ymeasPI_arr[k] = ymeasPI
+        yhatPI_arr[k] = yhatPI
+        uPI_arr[k] = uPI
+        ePI_arr[k] = ePI
 
     # -------------------------------------------------------------------------
     # 3. Plotting Results
@@ -116,8 +152,9 @@ if __name__ == "__main__":
 
     # Output Plot
     plt.subplot(2, 1, 1)
-    plt.plot(t, y_hat_arr, color="orange", label="Temperatura Estimada ($\\hat{y}$)")
-    plt.plot(t, r_arr, color="red", label="Referência ($r$)")
+    plt.plot(t, yhatIMC_arr, color="orange", label="Temperatura Estimada (IMC)")
+    plt.plot(t, yhatPI_arr, color="blue", label="Temperatura Estimada (PI)")
+    plt.plot(t, r_arr, color="red", label="Referência")
     plt.title("Saída do Sistema em Malha Fechada")
     plt.ylabel("Temperatura (°C)")
     plt.xlabel("Tempo (s)")
@@ -125,21 +162,22 @@ if __name__ == "__main__":
 
     # Control Signal Plot
     plt.subplot(2, 1, 2)
-    plt.step(t, u_arr, color="green", label="Esforço de Controle ($u$)")
+    plt.step(t, uIMC_arr, color="green", label="Esforço de Controle (IMC)")
+    plt.step(t, uPI_arr, color="purple", label="Esforço de Controle (PI)")
     plt.title("Saída do Controlador Digital")
     plt.ylabel("Tensão (V)")
     plt.xlabel("Tempo (s)")
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("resposta_malha_fechada.png")
+    plt.savefig("resposta_malha_fechada_imcpi.png")
 
     # -------------------------------------------------------------------------
     # 5. Closed-Loop Poles and Zeros
     # -------------------------------------------------------------------------
-    G = plant.get_tf()
-    F = digital_filter.get_tf()
-    C = controller.get_tf()
+    G = plantIMC.get_tf()
+    F = dfIMC.get_tf()
+    C = controllerIMC.get_tf()
 
     print(f"Função de Transferência do Sistema Discretizado:\n{G}\n")
     print(f"Função de Transferência do Filtro Digital:\n{F}\n")
