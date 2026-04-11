@@ -6,7 +6,7 @@ import numpy as np
 from control import TransferFunction
 from matplotlib.patches import Circle
 
-from digital_controller import DigitalControllerIMC, DigitalControllerPI
+from digital_controller import DigitalControllerIMC, DigitalControllerPID
 from digital_filter import DigitalFilter
 from discrete_system import DiscreteSystem
 
@@ -28,25 +28,25 @@ if __name__ == "__main__":
     controllerIMC = DigitalControllerIMC(tau_cl=tau / 2, T_s=Ts)
     dfIMC = DigitalFilter()
 
-    # Instantiate Components for the PI simulation
-    plantPI = DiscreteSystem(K=K, tau=tau, Ts=Ts, u_op=u0, y_op=y0)
-    controllerPI = DigitalControllerPI(Kp=-1.5, Ti=24.0, T_s=Ts)
-    dfPI = DigitalFilter()
+    # Instantiate Components for the PID simulation
+    plantPID = DiscreteSystem(K=K, tau=tau, Ts=Ts, u_op=u0, y_op=y0)
+    controllerPID = DigitalControllerPID(Kp=-1.5, Ti=24.0, Td=0.5, N=100, T_s=Ts)
+    dfPID = DigitalFilter()
 
     # Initialization / Bumpless Transfer Preparation
     # 1. Pre-fill filter buffers to the steady-state operating point
     for _ in range(dfIMC.median_window_size + 1):
         dfIMC.filter(y0)
-        dfPI.filter(y0)
+        dfPID.filter(y0)
 
     # 2. Pre-fill controller history explicitly
     controllerIMC.set_auto(False)
-    controllerPI.set_auto(False)
+    controllerPID.set_auto(False)
     for _ in range(3):
         controllerIMC.update_memory(u=u0, e=0.0)
-        controllerPI.update_memory(u=u0, e=0.0)
+        controllerPID.update_memory(u=u0, y=y0, r=y0)
     controllerIMC.set_auto(True)
-    controllerPI.set_auto(True)
+    controllerPID.set_auto(True)
 
     # Simulation Setup
     time_steps = 24000
@@ -73,19 +73,19 @@ if __name__ == "__main__":
     uIMC_arr = np.zeros(time_steps)
     eIMC_arr = np.zeros(time_steps)
 
-    # PI Data Containers
-    ymeasPI_arr = np.zeros(time_steps)
-    yhatPI_arr = np.zeros(time_steps)
-    uPI_arr = np.zeros(time_steps)
-    ePI_arr = np.zeros(time_steps)
+    # PID Data Containers
+    ymeasPID_arr = np.zeros(time_steps)
+    yhatPID_arr = np.zeros(time_steps)
+    uPID_arr = np.zeros(time_steps)
+    ePID_arr = np.zeros(time_steps)
 
     # Initial IMC State Iteration
     yIMC = y0
     uIMC = u0
 
-    # Initial PI State Iteration
-    yPI = y0
-    uPI = u0
+    # Initial PID State Iteration
+    yPID = y0
+    uPID = u0
 
     r = y0  # Initial setpoint
 
@@ -101,31 +101,31 @@ if __name__ == "__main__":
         # 1. Plant physical output (true state)
         if k > 0:
             yIMC = plantIMC.sample(uIMC)
-            yPI = plantPI.sample(uPI)
+            yPID = plantPID.sample(uPID)
 
         # 2. Add disturbance
         if dist0_start_k <= k:
             yIMC += dist0_mag
-            yPI += dist0_mag
+            yPID += dist0_mag
         if dist1_start_k <= k:
             yIMC += dist1_mag
-            yPI += dist1_mag
+            yPID += dist1_mag
 
         # 3. Sensor measurement with additive Gaussian noise
         ymeasIMC = yIMC + np.random.normal(0, noise_std)
-        ymeasPI = yPI + np.random.normal(0, noise_std)
+        ymeasPID = yPID + np.random.normal(0, noise_std)
 
         # 4. Filtering pipeline
         yhatIMC = dfIMC.filter(ymeasIMC)
-        yhatPI = dfPI.filter(ymeasPI)
+        yhatPID = dfPID.filter(ymeasPID)
 
         # 5. Error computation
         eIMC = r - yhatIMC
-        ePI = r - yhatPI
+        ePID = r - yhatPID
 
         # 6. Controller output
         uIMC = controllerIMC.compute(eIMC)
-        uPI = controllerPI.compute(ePI)
+        uPID = controllerPID.compute(r=r, y=yhatPID)
 
         # Log Data
         r_arr[k] = r
@@ -136,11 +136,11 @@ if __name__ == "__main__":
         uIMC_arr[k] = uIMC
         eIMC_arr[k] = eIMC
 
-        # PI Data Logging
-        ymeasPI_arr[k] = ymeasPI
-        yhatPI_arr[k] = yhatPI
-        uPI_arr[k] = uPI
-        ePI_arr[k] = ePI
+        # PID Data Logging
+        ymeasPID_arr[k] = ymeasPID
+        yhatPID_arr[k] = yhatPID
+        uPID_arr[k] = uPID
+        ePID_arr[k] = ePID
 
     # -------------------------------------------------------------------------
     # 3. Plotting Results
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     # Output Plot
     plt.subplot(2, 1, 1)
     plt.plot(t, yhatIMC_arr, color="orange", label="Temperatura Estimada (IMC)")
-    plt.plot(t, yhatPI_arr, color="blue", label="Temperatura Estimada (PI)")
+    plt.plot(t, yhatPID_arr, color="blue", label="Temperatura Estimada (PID)")
     plt.plot(t, r_arr, color="red", label="Referência")
     plt.title("Saída do Sistema em Malha Fechada")
     plt.ylabel("Temperatura (°C)")
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     # Control Signal Plot
     plt.subplot(2, 1, 2)
     plt.step(t, uIMC_arr, color="green", label="Esforço de Controle (IMC)")
-    plt.step(t, uPI_arr, color="purple", label="Esforço de Controle (PI)")
+    plt.step(t, uPID_arr, color="purple", label="Esforço de Controle (PID)")
     plt.title("Saída do Controlador Digital")
     plt.ylabel("Tensão (V)")
     plt.xlabel("Tempo (s)")
