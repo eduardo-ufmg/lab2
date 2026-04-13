@@ -4,11 +4,10 @@ import control
 import matplotlib.pyplot as plt
 import numpy as np
 from control import TransferFunction
-from matplotlib.patches import Circle
-
 from digital_controller import DigitalControllerIMC, DigitalControllerPID
 from digital_filter import DigitalFilter
 from discrete_system import DiscreteSystem
+from matplotlib.patches import Circle
 
 # -----------------------------------------------------------------------------
 # 2. Closed-Loop Integration & Validation

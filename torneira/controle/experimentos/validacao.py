@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 EXPERIMENT_NAME = "pi"  # Change to "imc" for the IMC experiment
 
@@ -30,7 +30,7 @@ def main():
     plt.savefig(f"experimento_{EXPERIMENT_NAME}.png")
 
     fit_start = 1300
-    fit_end = 1750
+    fit_end = 1800
     _, y_hat_fit, u_fit = ref[fit_start:], y_hat[fit_start:], u[fit_start:]
 
     y_hat_fit_mean = float(np.mean(y_hat_fit))
@@ -40,76 +40,46 @@ def main():
     u_fit = u_fit - u_fit_mean
 
     plt.figure()
-    plt.plot(y_hat_fit, label="Resposta do Sistema")
+    plt.plot(y_hat_fit, color="blue", label="y")
+    plt.plot(u_fit, color="red", label="u")
 
-    xpeak = 1382
-    xvalley = 1462
+    ku_peak0 = 1385
+    ky_valley0 = 1462
+    ky_valley2 = 1762
 
+    vu_peak = 1.5
+    vu_valley = -1.3
+    vy_peak = 1.0
+    vy_valley = -0.9
+
+    plt.vlines(x=ku_peak0, ymin=-1.4, ymax=1.6, colors="green", label="pico_u")
     plt.vlines(
-        x=xpeak, ymin=y_hat_fit.min(), ymax=y_hat_fit.max(), colors="red", label="xpico"
-    )
-    plt.vlines(
-        x=xvalley,
-        ymin=y_hat_fit.min(),
-        ymax=y_hat_fit.max(),
-        colors="red",
-        label="xvale",
-    )
-
-    P = (xvalley - xpeak) * 2  # samples
-    Ps = P * 0.1  # Ts = 0.1 s
-    print(f"Período P: {P} amostras, {Ps:.1f} segundos")
-
-    ypeak = 29.0 - y_hat_fit_mean
-    yvalley = 27.125 - y_hat_fit_mean
-
-    plt.hlines(y=ypeak, xmin=fit_start, xmax=fit_end, colors="green", label="ypico")
-    plt.hlines(y=yvalley, xmin=fit_start, xmax=fit_end, colors="green", label="yvale")
-
-    Ymag = (ypeak - yvalley) / 2
-    print(f"Amplitude Y: {Ymag:.1f} °C")
-
-    plt.plot(u_fit, label="Sinal de Controle")
-
-    xpeak_u = 1381
-    xvalley_u = 1461
-
-    plt.vlines(
-        x=xpeak_u, ymin=u_fit.min(), ymax=u_fit.max(), colors="orange", label="xpico_u"
-    )
-    plt.vlines(
-        x=xvalley_u,
-        ymin=u_fit.min(),
-        ymax=u_fit.max(),
-        colors="orange",
-        label="xvale_u",
-    )
-
-    dk = Ps * 3
-    dt = dk * 0.1  # Ts = 0.1 s
-    print(f"Atraso dk: {dk} amostras, {dt:.1f} segundos")
-
-    phi = -2 * np.pi * dt / Ps
-    print(f"Atraso em fase: {phi:.2f} radianos, {np.degrees(phi):.1f} graus")
-
-    ypeak_u = 1.5
-    yvalley_u = -1.3
-
-    plt.hlines(
-        y=ypeak_u, xmin=fit_start, xmax=fit_end, colors="purple", label="ypico_u"
+        x=[ky_valley0, ky_valley2], ymin=-1.4, ymax=1.6, colors="orange", label="vale_y"
     )
     plt.hlines(
-        y=yvalley_u, xmin=fit_start, xmax=fit_end, colors="purple", label="yvale_u"
+        y=[vu_peak, vu_valley],
+        xmin=fit_start,
+        xmax=fit_end,
+        colors="purple",
+        label="|u|",
     )
+    plt.hlines(
+        y=[vy_peak, vy_valley],
+        xmin=fit_start,
+        xmax=fit_end,
+        colors="magenta",
+        label="|y|",
+    )
+    plt.legend(loc=(1.01, 0.5))
 
-    Umag = (ypeak_u - yvalley_u) / 2
-    print(f"Amplitude U: {Umag:.1f} V")
+    Ku = (vu_peak - vu_valley) / 2
+    Ky = (vy_peak - vy_valley) / 2
+    M = Ky / Ku
 
-    M = Ymag / Umag
-    print(f"Ganho de Magnitude: {M:.1f} °C/V")
+    Pu = (ky_valley2 - ky_valley0) / 2 * 0.1  # seconds
 
-    plt.xlabel("Amostra")
-    plt.ylabel("Magnitude")
+    plt.text(1830, -0.5, f"M = {M:.3f}\nPu = {Pu:.3f} s")
+
     plt.minorticks_on()
     plt.grid(which="both")
 

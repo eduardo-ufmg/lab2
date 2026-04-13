@@ -5,7 +5,6 @@ from data_io import (
     load_model_predictions,
     plot_filter,
 )
-
 from digital_filter import DigitalFilter
 
 

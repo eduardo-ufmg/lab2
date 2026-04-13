@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.optimize import least_squares
 from data_io import load_experiment_data, plot_comparison
+from scipy.optimize import least_squares
 
 Ts = 0.1
 

@@ -1,8 +1,8 @@
 # we forgot to store the first experiment's data so we will need to simulate it here
 
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as signal
-import matplotlib.pyplot as plt
 
 y_final = 27.0
 y_0 = 23.0

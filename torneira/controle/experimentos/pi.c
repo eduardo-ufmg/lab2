@@ -28,9 +28,11 @@
 #define ALPHA 0.88
 
 /* Controller Parameters */
-#define Kp ((float64)(-1.5))
-#define Ti ((float64)(24.0))
-#define Ts SAMPLING_PERIOD_SEC
+#define Kp 0.663
+#define Ti 12.50
+#define Ts 0.100
+#define U_MIN 2.0
+#define U_MAX 8.0
 
 #define DAQmxErrChk(functionCall)                                \
   do {                                                           \
@@ -105,67 +107,48 @@ static inline void controller_init(controller_state_t *c, float64 u0, float64 e0
 
 static inline float64 controller_update_euler(controller_state_t *c, float64 e_n)
 {
-  const float64 u_min = 2.0;
-  const float64 u_max = 8.0;
+  /* Backward Euler coefficients */
+  float64 q0 = Kp * (1.0 + Ts / Ti);
+  float64 q1 = -Kp;
 
-  const float64 Ki = Kp / Ti;
+  /* Compute raw control action */
+  float64 u_n = c->u_prev + q0 * e_n + q1 * c->e_prev;
 
-  /* Compute candidate (unsaturated) control */
-  float64 du_p = Kp * (e_n - c->e_prev);
-  float64 du_i = Ki * Ts * e_n;
-
-  float64 u_unsat = c->u_prev + du_p + du_i;
-
-  /* Apply saturation */
-  float64 u_sat = fmax(fmin(u_unsat, u_max), u_min);
-
-  /* Anti-windup: conditional integration */
-  int saturating_high = (u_unsat > u_max);
-  int saturating_low = (u_unsat < u_min);
-
-  if ((saturating_high && e_n > 0.0) || (saturating_low && e_n < 0.0)) {
-    /* Remove integral contribution */
-    u_unsat = c->u_prev + du_p;
-    u_sat = fmax(fmin(u_unsat, u_max), u_min);
+  /* Anti-windup via output saturation */
+  if (u_n > U_MAX) {
+    u_n = U_MAX;
+  } else if (u_n < U_MIN) {
+    u_n = U_MIN;
   }
 
-  c->u_prev = u_sat;
+  /* State update */
+  c->u_prev = u_n;
   c->e_prev = e_n;
 
-  return u_sat;
+  return u_n;
 }
 
 static inline float64 controller_update_tustin(controller_state_t *c, float64 e_n)
 {
-  const float64 u_min = 2.0;
-  const float64 u_max = 8.0;
+  /* Tustin (Bilinear) coefficients */
+  float64 q0 = Kp * (1.0 + Ts / (2.0 * Ti));
+  float64 q1 = -Kp * (1.0 - Ts / (2.0 * Ti));
 
-  const float64 a = Kp;
-  const float64 b = Kp * (Ts / (2.0 * Ti));
+  /* Compute raw control action */
+  float64 u_n = c->u_prev + q0 * e_n + q1 * c->e_prev;
 
-  /* Incremental contributions */
-  float64 du_p = a * (e_n - c->e_prev);
-  float64 du_i = b * (e_n + c->e_prev);
-
-  float64 u_unsat = c->u_prev + du_p + du_i;
-
-  /* Saturation */
-  float64 u_sat = fmax(fmin(u_unsat, u_max), u_min);
-
-  /* Anti-windup: conditional integration */
-  int sat_high = (u_unsat > u_max);
-  int sat_low = (u_unsat < u_min);
-
-  if ((sat_high && e_n > 0.0) || (sat_low && e_n < 0.0)) {
-    /* Remove integral contribution */
-    u_unsat = c->u_prev + du_p;
-    u_sat = fmax(fmin(u_unsat, u_max), u_min);
+  /* Anti-windup via output saturation */
+  if (u_n > U_MAX) {
+    u_n = U_MAX;
+  } else if (u_n < U_MIN) {
+    u_n = U_MIN;
   }
 
-  c->u_prev = u_sat;
+  /* State update */
+  c->u_prev = u_n;
   c->e_prev = e_n;
 
-  return u_sat;
+  return u_n;
 }
 
 /* Global state */
@@ -277,7 +260,7 @@ void *control_loop_task(void *arg)
         current_state = SYSTEM_STATE_CONTROL;
       }
 
-      printf("%lf\n", y_hat_celsius);
+      if (wait_timeout_counter % 10 == 0) { printf("%lf\n", y_hat_celsius); }
 
     } else if (current_state == SYSTEM_STATE_CONTROL) {
 
@@ -300,7 +283,7 @@ void *control_loop_task(void *arg)
 
       samples_recorded++;
 
-      printf("%d, %lf, %lf, %lf\n", samples_recorded, ref, y_hat_celsius, data_write);
+      if (samples_recorded % 10 == 0) { printf("%lf, %lf, %lf\n", ref, y_hat_celsius, data_write); }
 
       if (samples_recorded >= N_SAMPLES) { break; /* Target completed */ }
     }
