@@ -418,6 +418,42 @@ A figura \ref{fig:resposta_malha_fechada_imcpi} compara a resposta do sistema em
 
 Na simulação, o controlador PI proporciona tanto seguimento quanto rejeição de perturbações com resposta mais rápida do que o controlador baseado em modelo interno, ao custo de uma ação de controle mais ruidosa e agressiva. Para ambos, a performance observada na simulação é significativamente melhor do que a performance observada nos experimentos, o que sugere a presença de fatores não modelados ou imperfeições de implementação que afetam o comportamento do sistema em tempo real.
 
+\section{Ajuste do Controlador PI}
+
+Com os dados do experimento em malha fechada, um modelo atualizado para o sistema, $G_1(s)$, é buscado. Por simplicidade, este é estruturado para incluir a dinâmica do filtro. O modelo, encontrado por otimização numérica, é dado por \ref{eq:modelo_atualizado}.
+
+\begin{equation}
+    \label{eq:modelo_atualizado}
+    G_1(s) = \frac{-1.2951}{8.4330 s + 1}e^{-2.1207 s}
+\end{equation}
+
+Sua resposta, em \ref{fig:resposta_simulada_vs_medida}, captura a tendência da planta, mas falha em representar as oscilações em torno dela.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../modelo_mf/resposta_simulada_vs_medida.png}
+    \caption{Comparação entre a resposta simulada do modelo atualizado e a resposta medida do sistema em malha fechada com o controlador PI.}
+    \label{fig:resposta_simulada_vs_medida}
+\end{figure}
+
+Portanto, o modelo atualizado é considerado inadequado para representar a dinâmica do sistema em malha fechada. Assim, o controlador PI é sintonizado pelo método de Ziegler-Nichols \cite{Aguirre2023}. Para tanto, a seção posterior ao segundo degrau é considerada, conforme \ref{fig:experimento_pi_fit}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../controle/experimentos/experimento_pi_fit.png}
+    \caption{Seção do experimento em malha fechada com o controlador PI considerada para o ajuste do controlador.}
+    \label{fig:experimento_pi_fit}
+\end{figure}
+
+Pelas métricas capturadas nesta seção, os parâmetros indicados pelo método são
+
+\begin{equation}
+\begin{aligned}
+    K_p &= -0.663 \\
+    T_i &= +12.50
+\end{aligned}
+\end{equation}
+
 
 
 \bibliography{bibliografia}

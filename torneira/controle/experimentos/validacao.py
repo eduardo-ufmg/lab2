@@ -83,6 +83,9 @@ def main():
     plt.minorticks_on()
     plt.grid(which="both")
 
+    plt.xlabel("Amostra")
+    plt.ylabel("Sinal")
+
     plt.tight_layout()
     plt.savefig(f"experimento_{EXPERIMENT_NAME}_fit.png")
 

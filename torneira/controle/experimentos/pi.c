@@ -28,9 +28,11 @@
 #define ALPHA 0.88
 
 /* Controller Parameters */
-#define Kp 0.663
-#define Ti 12.50
-#define Ts 0.100
+#define Kp -0.663
+#define Ti +12.50
+
+#define Ts 0.1
+
 #define U_MIN 2.0
 #define U_MAX 8.0
 
