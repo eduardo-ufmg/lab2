@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # Instantiate Components for the PID simulation
     plantPID = DiscreteSystem(K=K, tau=tau, Ts=Ts, u_op=u0, y_op=y0)
-    controllerPID = DigitalControllerPID(Kp=-1.5, Ti=24.0, Td=0.5, N=100, T_s=Ts)
+    controllerPID = DigitalControllerPID(Kp=-1.5, Ti=24.0, Td=0.0, N=0, T_s=Ts)
     dfPID = DigitalFilter()
 
     # Initialization / Bumpless Transfer Preparation

@@ -2,128 +2,116 @@ import numpy as np
 from scipy.optimize import least_squares
 from data_io import load_experiment_data, plot_comparison
 
+Ts = 0.1
 
-def simulate_closed_loop_discrete(theta, ref, y0, u0, na, nb):
+Pu_seconds = 16.0
+wu = (2 * np.pi) / Pu_seconds
+
+Kinit = -1.4
+M = 0.7
+phi = -1.88
+
+# Initial algebraic guesses
+tauinit = (1 / wu) * np.sqrt((Kinit / M) ** 2 - 1)
+Linit = (-phi - np.arctan(tauinit * wu)) / wu
+
+
+def simulate(theta, r_data, Ts, u0, y0):
     """
-    Simulates the closed-loop system using a generic discrete OE model.
-    theta = [b_0, b_1, ..., b_{nb}, a_1, a_2, ..., a_{na}]
+    Computes the error between the measured plant output and a closed-loop
+    simulation using the current FOPDT parameter vector theta.
     """
-    # Extract polynomials
-    b = theta[: nb + 1]
-    a = theta[nb + 1 :]
-
-    # Controller coefficients
-    q0, q1 = -1.50625, 1.5
-
-    N = len(ref)
+    K, tau, L = theta
+    N = len(r_data)
     y_sim = np.zeros(N)
     u_sim = np.zeros(N)
     e = np.zeros(N)
 
-    # Initialize states
+    # Initialize at measured steady-state
     y_sim[0] = y0
     u_sim[0] = u0
-    e[0] = ref[0] - y0
+    e[0] = r_data[0] - y0
+
+    # Discretize FOPDT (Zero-Order Hold equivalent using difference equation)
+    a = np.exp(-Ts / tau)
+    b = K * (1 - a)
+    d = int(max(0, np.round(L / Ts)))
+
+    # Original DigitalControllerPI parameters
+    Kp = -1.5
+    Ti = 24.0
+    Ki = Kp / Ti
+    u_min, u_max = 2.0, 8.0
 
     for k in range(1, N):
-        # A. Compute Plant Output y(k)
-        yk = 0.0
+        # 1. Process Update (Deviation Variables)
+        u_past = u_sim[k - 1 - d] if (k - 1 - d) >= 0 else u0
+        y_sim[k] = y0 + a * (y_sim[k - 1] - y0) + b * (u_past - u0)
 
-        # Autoregressive terms (Denominator: a_1 to a_na)
-        for i in range(1, na + 1):
-            idx = k - i
-            val = y_sim[idx] if idx >= 0 else y0
-            yk -= a[i - 1] * val
+        # 2. Controller Update (Original Incremental Logic)
+        e[k] = r_data[k] - y_sim[k]
+        du_p = Kp * (e[k] - e[k - 1])
+        du_i = Ki * e[k] * Ts
 
-        # Moving average terms (Numerator: b_0 to b_nb)
-        for j in range(0, nb + 1):
-            idx = k - j
-            val = u_sim[idx] if idx >= 0 else u0
-            yk += b[j] * val
+        v_new = u_sim[k - 1] + du_p + du_i
 
-        y_sim[k] = yk
+        # Anti-windup (Conditional Integration)
+        sat_high = v_new > u_max
+        sat_low = v_new < u_min
 
-        # B. Compute Error e(k)
-        e[k] = ref[k] - y_sim[k]
+        if (sat_high and e[k] > 0) or (sat_low and e[k] < 0):
+            v_new = u_sim[k - 1] + du_p
 
-        # C. Compute Controller Output u(k)
-        u_calc = u_sim[k - 1] + q0 * e[k] + q1 * e[k - 1]
-
-        # D. Apply Saturation Bounds [2, 8]
-        u_sim[k] = np.clip(u_calc, 2.0, 8.0)
+        u_sim[k] = max(u_min, min(u_max, v_new))
 
     return y_sim, u_sim
 
 
-def objective_function(theta, ref, y_hat, y0, u0, na, nb):
-    """Calculates the residual array for least_squares."""
-    y_sim, _ = simulate_closed_loop_discrete(theta, ref, y0, u0, na, nb)
-
-    # Strictly penalize unstable roots (divergent simulations)
-    if not np.all(np.isfinite(y_sim)) or np.any(np.abs(y_sim) > 1e6):
-        return np.full(len(y_hat), 1e6)
-
-    return y_hat - y_sim
+def objective_function(theta, y_data, r_data, Ts, u0, y0):
+    y_sim, _ = simulate(theta, r_data, Ts, u0, y0)
+    return y_sim - y_data  # Residuals for least squares
 
 
 def main():
-    data = load_experiment_data("experimento_pi.txt")
-    if data is None:
-        return
 
-    ref, y_hat, u = data
-    ref, y_hat, u = ref[500:], y_hat[500:], u[500:]  # Discard initial transient
+    # Optimization Formulation
+    theta_init = [Kinit, tauinit, Linit]
 
-    # Extract physical initial conditions
-    y0 = y_hat[0]
-    u0 = u[0]
-
-    # --- Structure Definition ---
-    # na: Number of denominator coefficients (poles/order).
-    # nb: Number of numerator coefficients.
-    # Set nb large enough to capture the maximum expected discrete delay.
-    # E.g., if max expected delay is 3 seconds at Ts=0.1, max d = 30. Set nb = 30 + expected zeros.
-
-    na = 0
-    nb = 100
-
-    # Dynamic parameter initialization: [b_0, ..., b_nb, a_1, ..., a_na]
-    # Initializing 'a' coefficients to simulate a stable integrator/low-pass behavior is generally safer
-    # than zeros to prevent immediate gradient explosions.
-    initial_b = np.zeros(nb + 1)
-    initial_b[0] = -0.01  # Small negative gain to match known negative Kp
-    initial_a = np.zeros(na)
-    if na > 0:
-        initial_a[0] = -0.9  # Stable pole approximation
-
-    initial_theta = np.concatenate((initial_b, initial_a))
-
-    # Parameter estimation (Unconstrained, relying on instability penalty)
-    result = least_squares(
-        objective_function,
-        initial_theta,
-        args=(ref, y_hat, y0, u0, na, nb),
-        method="lm",  # Levenberg-Marquardt is often better for unconstrained nonlinear least squares
-        max_nfev=5000,
+    print(
+        f"Initial Parameter Guesses:\nK = {theta_init[0]:.4f}\ntau = {theta_init[1]:.4f}\nL = {theta_init[2]:.4f}"
     )
 
-    if not result.success:
-        print(f"Optimization failed: {result.message}")
-        return
+    # Bounds: Process is reverse-acting (K < 0). Time constants strictly positive.
+    lower_bounds = [-np.inf, 1e-3, 0.0]
+    upper_bounds = [0.0, np.inf, np.inf]
 
-    estimated_theta = result.x
-    est_b = estimated_theta[: nb + 1]
-    est_a = estimated_theta[nb + 1 :]
+    # Load experimental arrays
+    data = load_experiment_data("experimento_pi.txt")
+    if data is None:
+        raise ValueError("Failed to load data. Please check the file path and format.")
 
-    print(f"--- Identification Results (na={na}, nb={nb}) ---")
-    print(f"Denominator (a) coefficients: {est_a}")
-    print(f"Numerator (b) coefficients:\n{np.round(est_b, 4)}")
+    ref, y_hat, u = data
 
-    # Simulate with estimated parameters
-    y_sim, u_sim = simulate_closed_loop_discrete(estimated_theta, ref, y0, u0, na, nb)
+    # Non-Linear Least Squares
+    result = least_squares(
+        objective_function,
+        x0=theta_init,
+        bounds=(lower_bounds, upper_bounds),
+        args=(y_hat, ref, Ts, u[0], y_hat[0]),
+        loss="soft_l1",  # Soft L1 loss adds robustness against high-frequency harmonic discrepancies
+    )
 
-    # Plot comparison
-    plot_comparison(ref, y_hat, y_sim, u, u_sim, f"resposta_discreta_na{na}_nb{nb}.png")
+    K_opt, tau_opt, L_opt = result.x
+    print(
+        f"Optimized Parameters:\nK = {K_opt:.4f}\ntau = {tau_opt:.4f}\nL = {L_opt:.4f}"
+    )
+
+    # Simulate with optimized parameters for comparison
+    y_sim_opt, u_sim_opt = simulate(result.x, ref, Ts, u[0], y_hat[0])
+
+    plot_comparison(
+        ref, y_hat, y_sim_opt, u, u_sim_opt, "resposta_simulada_vs_medida.png"
+    )
 
 
 if __name__ == "__main__":
