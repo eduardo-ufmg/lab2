@@ -29,7 +29,7 @@
 
 /* Controller Parameters */
 #define Kp -0.663
-#define Ti +12.50
+#define Ti +28.00
 
 #define Ts 0.1
 
@@ -276,7 +276,7 @@ void *control_loop_task(void *arg)
       }
 
       float64 error = ref - y_hat_celsius;
-      data_write = controller_update_euler(&controller, error);
+      data_write = controller_update_tustin(&controller, error);
 
       /* Log state */
       record_buffer[samples_recorded].ref = ref;

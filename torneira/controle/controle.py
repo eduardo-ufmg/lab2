@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     # Initialization / Bumpless Transfer Preparation
     # 1. Pre-fill filter buffers to the steady-state operating point
-    for _ in range(dfIMC.median_window_size + 1):
+    for _ in range(100):
         dfIMC.filter(y0)
         dfPID.filter(y0)
 
@@ -64,19 +64,19 @@ if __name__ == "__main__":
     dist1_start_k = 17200
 
     # Data Containers
-    r_arr = np.zeros(time_steps)
+    r_arr = np.full(time_steps, y0)
 
     # IMC Data Containers
-    ymeasIMC_arr = np.zeros(time_steps)
-    yhatIMC_arr = np.zeros(time_steps)
-    uIMC_arr = np.zeros(time_steps)
-    eIMC_arr = np.zeros(time_steps)
+    ymeasIMC_arr = np.full(time_steps, y0)
+    yhatIMC_arr = np.full(time_steps, y0)
+    uIMC_arr = np.full(time_steps, u0)
+    eIMC_arr = np.full(time_steps, 0.0)
 
     # PID Data Containers
-    ymeasPID_arr = np.zeros(time_steps)
-    yhatPID_arr = np.zeros(time_steps)
-    uPID_arr = np.zeros(time_steps)
-    ePID_arr = np.zeros(time_steps)
+    ymeasPID_arr = np.full(time_steps, y0)
+    yhatPID_arr = np.full(time_steps, y0)
+    uPID_arr = np.full(time_steps, u0)
+    ePID_arr = np.full(time_steps, 0.0)
 
     # Initial IMC State Iteration
     yIMC = y0
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     # Output Plot
     plt.subplot(2, 1, 1)
     plt.plot(t, yhatIMC_arr, color="orange", label="Temperatura Estimada (IMC)")
-    plt.plot(t, yhatPID_arr, color="blue", label="Temperatura Estimada (PID)")
+    plt.plot(t, yhatPID_arr, color="blue", label="Temperatura Estimada (PI)")
     plt.plot(t, r_arr, color="red", label="Referência")
     plt.title("Saída do Sistema em Malha Fechada")
     plt.ylabel("Temperatura (°C)")
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     # Control Signal Plot
     plt.subplot(2, 1, 2)
     plt.step(t, uIMC_arr, color="green", label="Esforço de Controle (IMC)")
-    plt.step(t, uPID_arr, color="purple", label="Esforço de Controle (PID)")
+    plt.step(t, uPID_arr, color="purple", label="Esforço de Controle (PI)")
     plt.title("Saída do Controlador Digital")
     plt.ylabel("Tensão (V)")
     plt.xlabel("Tempo (s)")

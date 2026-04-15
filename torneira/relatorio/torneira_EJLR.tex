@@ -4,21 +4,58 @@
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{float}
+\usepackage{fancyhdr}
 
 \begin{document}
 
-\title{Controle de Temperatura de uma Torneira Elétrica}
-
-% authors only; addresses and emails have been removed from the class
-\author{Eduardo Henrique Basilio de Carvalho}
-\author{Joao Vitor Braga da Silva Alves}
-\author{Renan Neves da Silva}
-
-\maketitle
-
 \selectlanguage{brazil}
 
-\section{Introdução}
+\title{Controle de Temperatura de uma Torneira Elétrica}
+
+\begin{titlepage}
+    \centering
+
+    {\Large Universidade Federal de Minas Gerais\par}
+    \vspace{0.5cm}
+    {\large Laboratorio de Controle II\par}
+    \vspace{2.2cm}
+
+    {\LARGE\bfseries Controle de Temperatura de uma Torneira Elétrica\par}
+    \vspace{1.2cm}
+
+    {\large Relatório Técnico\par}
+    \vspace{2.0cm}
+
+    \begin{flushleft}
+        \textbf{Professor:} Cláudio Dias Campos \\
+        \textbf{Data:} \today
+    \end{flushleft}
+
+    \begin{flushleft}
+        \textbf{Autores:} \\
+        Eduardo Henrique Basilio de Carvalho \\
+        Joao Vitor Braga da Silva Alves \\
+        Leticia Vitoria Martins do Carmo \\
+        Renan Neves da Silva
+    \end{flushleft}
+\end{titlepage}
+
+\pagebreak
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\setlength{\headheight}{14pt}
+\setlength{\footskip}{10pt}
+
+\tableofcontents
+
+\listoffigures
+
+\pagebreak
+
+\section{Introdução}\label{sec:introducao}
 
 O objetivo deste trabalho é alcançar o controle de temperatura de uma torneira elétrica sob as seguintes condições:
 
@@ -35,7 +72,7 @@ O objetivo deste trabalho é alcançar o controle de temperatura de uma torneira
     \item \textbf{Critérios de aceitação:} Rastreamento de referência de temperatura em degrau e rejeição de perturbações.
 \end{itemize}
 
-\section{Caracterização da Confiabilidade Temporal do Kernel de Tempo Real}
+\section{Caracterização da Confiabilidade Temporal do Kernel de Tempo Real}\label{sec:caracterizacao}
 
 Para caracterizar a confiabilidade temporal do kernel de tempo real, o seguinte experimento foi conduzido para $P_\text{configurado} \in \{1,10,100\}\,\text{ms}$:
 
@@ -66,7 +103,7 @@ Pela limitação de recursos computacionais, o número de amostras $N$ foi defin
 
 A tabela \ref{tab:resultados_temporais} apresenta os resultados dos experimentos de caracterização temporal do kernel de tempo real. Observa-se que a média dos períodos medidos $\bar{P}$ é, nos algarismo significativos considerados, igual ao período configurado $P_\text{configurado}$ para todas as configurações testadas. O desvio padrão $\sigma_P$ é relativamente baixo, indicando que os períodos medidos estão próximos da média, o que sugere um comportamento temporal consistente do kernel de tempo real sob as condições do experimento.
 
-\section{Coleta dos Dados}
+\section{Coleta dos Dados}\label{sec:experimento_identificacao}
 
 O experimento consiste em um par de degraus, separados por tempo o suficiente para que o sistema atinja um estado estacionário, e com direções opostas. O período de amostragem selecionado é de $100 ms$. Sob este, o primeiro degrau, de $8 V$ para $2 V$, é aplicado na amostra $k = 1800$, e o segundo degrau, de $2 V$ para $8 V$, é aplicado na amostra $k = 3600$. O experimento é conduzido por um total de $N = 5400$ amostras, o que corresponde a um tempo total de aquisição de $540 s$.
 
@@ -88,7 +125,7 @@ A visualização das curvas expõe a presença de ruído e de fortes pertubaçõ
     \label{fig:experimento_valido}
 \end{figure}
 
-\section{Identificação do Sistema}
+\section{Identificação do Sistema}\label{sec:identificacao}
 
 Pelas características térmicas do sistema, no qual a dinâmica da temperatura na planta é estimada muito mais rápida do que a dinâmica da temperatura no sensor, é esperado que o modelo \ref{eq:modelo} seja adequado para representar a dinâmica da planta.
 
@@ -201,13 +238,13 @@ Já a comparação entre os resíduos do sinal bruto, filtrado pela mediana móv
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.75\linewidth]{../filtro/residuos.png}
-    \caption{Comparação entre os resíduos do sinal bruto, filtrado pela mediana móvel, e filtrado pelo filtro digital completo. Nesta figura, as curvas azul, laranja e verde correspondem, respectivamente, aos resíduos do sinal bruto, filtrado pela mediana móvel e filtrado pelo filtro digital completo.}
+    \caption{Comparação entre os resíduos do sinal bruto, filtrado pela mediana móvel, e filtrado pelo filtro digital completo. Nesta figura, as curvas azul, laranja e verde correspondem, respectivamente, aos resíduos destes sinais.}
     \label{fig:residuos}
 \end{figure}
 
 As curvas em \ref{fig:filtro} indicam preservação da dinâmica do sistema pelo filtro digital, dado que a resposta filtrada segue a resposta do sistema com fidelidade de tendência. Por outro lado, análise visual das curvas de resíduos sugere que o filtro digital atenua os efeitos do ruído de alta frequência melhor do que o filtro de mediana móvel, o que coincide com a expectativa dada pela análise de frequência do sistema e do filtro digital.
 
-Por fim, \ref{fig:validacao} apresenta a comparação entre os sinais bruto e filtrado pela implementação completa do filtro digital no sistema em tempo real, obtidas em um novo experimento, de validação.
+Por fim, \ref{fig:validacao} apresenta a comparação entre os sinais bruto e filtrado pela implementação completa do filtro digital no sistema em tempo real, obtidas em um novo experimento, exclusivo para validação.
 
 \begin{figure}[H]
     \centering
@@ -216,9 +253,9 @@ Por fim, \ref{fig:validacao} apresenta a comparação entre os sinais bruto e fi
     \label{fig:validacao}
 \end{figure}
 
-A perturbação retangular, de alta amplitude e curta duração, observada na seção anterior à considerada válida, é considerada defeito no sistema de condicionamento do sinal e não tratada neste trabalho.
+A perturbação retangular, de alta amplitude e curta duração, observada na seção anterior à considerada válida, é tida como defeito no sistema de condicionamento do sinal e não tratada neste trabalho.
 
-\section{Controlador}
+\section{Controlador}\label{sec:projeto_imc}
 
 \subsection{Discretização do Modelo do Sistema}
 
@@ -353,7 +390,7 @@ A proxímidade entre alguns zeros e polos pode sugerir a simplificação da fun�
     \label{fig:comparacao_resposta_degrau}
 \end{figure}
 
-\subsection{Simulação}
+\subsection{Simulação}\label{sec:simulacao_imc}
 
 Para a simulação, \ref{eq:modelo_discretizado_temperatura}, \ref{eq:filtro_sintonizado} e \ref{eq:controlador_implementavel} são implementados em equações de diferenças. Um vetor de referência e um vetor de perturbação de temperatura são definidos, e a resposta do sistema em malha fechada é calculada por meio de simulação iterativa. A figura \ref{fig:resposta_malha_fechada} apresenta a resposta do sistema em malha fechada à condição simulada.
 
@@ -366,7 +403,7 @@ Para a simulação, \ref{eq:modelo_discretizado_temperatura}, \ref{eq:filtro_sin
 
 Nesta, são evidenciadas a capacidade de rastreamento da referência, a rejeição de perturbações, e a suavidade da ação de controle.
 
-\section{Validação do Controlador em Experimentos}
+\section{Validação do Controlador em Experimentos}\label{sec:experimento_controlador}
 
 Para sua validação, o controlador é implementado no sistema em tempo real, e um experimento é conduzido. A figura \ref{fig:experimento_inicial} mostra o comportamento do sistema neste experimento.
 
@@ -391,7 +428,7 @@ Sua implementação em equação de diferenças é dada por \ref{eq:pi_diferenca
 \begin{equation}
     \begin{aligned}
         u[n] &= (-1.5 + \frac{-1.5}{24} 0.1) e[n] + 1.5 e[n-1] + u[n-1] \\
-        u[n] &= max(min(8, u[n]), 2)
+        u[n] &= \max(\min(8, u[n]), 2)
     \end{aligned}
     \label{eq:pi_diferencas}
 \end{equation}
@@ -418,7 +455,7 @@ A figura \ref{fig:resposta_malha_fechada_imcpi} compara a resposta do sistema em
 
 Na simulação, o controlador PI proporciona tanto seguimento quanto rejeição de perturbações com resposta mais rápida do que o controlador baseado em modelo interno, ao custo de uma ação de controle mais ruidosa e agressiva. Para ambos, a performance observada na simulação é significativamente melhor do que a performance observada nos experimentos, o que sugere a presença de fatores não modelados ou imperfeições de implementação que afetam o comportamento do sistema em tempo real.
 
-\section{Ajuste do Controlador PI}
+\section{Ajuste do Controlador PI}\label{sec:ajuste_pi}
 
 Com os dados do experimento em malha fechada, um modelo atualizado para o sistema, $G_1(s)$, é buscado. Por simplicidade, este é estruturado para incluir a dinâmica do filtro. O modelo, encontrado por otimização numérica, é dado por \ref{eq:modelo_atualizado}.
 
@@ -454,7 +491,28 @@ Pelas métricas capturadas nesta seção, os parâmetros indicados pelo método 
 \end{aligned}
 \end{equation}
 
+A figura \ref{fig:experimento_pizn} apresenta o comportamento do sistema com o controlador PI ajustado, em um novo experimento.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{../controle/experimentos/experimento_pizn.png}
+    \caption{Comportamento do sistema durante o experimento de validação do controlador PI ajustado pelo método de Ziegler-Nichols.}
+    \label{fig:experimento_pizn}
+\end{figure}
+
+Com estes parametros, a resposta do sistema em malha fechada é significativamente melhor, com redução do sobresinal e do tempo de acomodação. Ao mesmo tempo, a ação de controle é menos agressiva e mais estável. Assim, o método de Ziegler-Nichols é considerado eficaz para o ajuste do controlador PI, e o controlador ajustado é considerado satisfatório para o controle de temperatura da torneira elétrica.
+
+\section{Conclusão}
+
+Este trabalho produz um controlador PI capaz de controlar, satisfatoriamente, a temperatura da torneira elétrica da bancada objeto da atividade. Em \ref{sec:introducao}, são definidas as condições e critérios de aceitação para o controle. Já \ref{sec:caracterizacao}, expõe o processo de caracterização da confiabilidade temporal do kernel de tempo real, evidenciando um comportamento consistente. \ref{sec:experimento_identificacao} e \ref{sec:identificacao}, apresentam a coleta dos dados do sistema e identificação de um modelo de primeira ordem para representar sua dinâmica. Em \ref{sec:filtro_digital}, é projetado um filtro digital para mitigar os efeitos do ruído presente nos dados, e validada sua implementação no sistema em tempo real. Um controlador baseado em modelo interno é projetado em \ref{sec:projeto_imc} e a resposta do sistema em malha fechada com este controlador é simulada em \ref{sec:simulacao_imc}. Entretanto, em \ref{sec:experimento_controlador}, na qual o controlador baseado em modelo interno é implementado no sistema em tempo real, este apresenta comportamento incoerente, o que leva à implementação de um controlador PI simples, validado com sucesso. Por fim, em \ref{sec:ajuste_pi}, o controlador PI é ajustado pelo método de Ziegler-Nichols, e validado por meio de experimento.
+
+Uma análise de requisitos e condições de operação, em \ref{sec:filtro_digital}, sugere que um filtro para redução de ruído branco não é estritamente necessário para o controle do sistema, dado que os critérios de aceitação propostos não especificam tempo de resposta ou overshoot, e o controlador PI é considerado robusto o suficiente para lidar com o ruído presente. Ainda assim, a implementação de um filtro digital de primeira ordem é realizada para fins de aprendizado, e validada por meio de análise visual dos resíduos e experimento em tempo real. O filtro digital é considerado eficaz para atenuar os efeitos do ruído de alta frequência, preservando a dinâmica do sistema.
+
+Pelo modelo identificado em \ref{sec:identificacao}, é esperado que o controlador projetado em \ref{sec:projeto_imc} seja capaz de controlar o sistema. Entretanto, a incoerência entre o comportamento esperado e o comportamento observado em \ref{sec:experimento_controlador} sugere a presença de erros de projeto ou implementação, ou fatores não modelados que afetam o comportamento do sistema em tempo real. Dada a limitação de tempo para a realização deste trabalho, a retomada do projeto do controlador baseado em modelo interno é adiada para trabalhos futuros, e o controlador PI é mantido para aprimoramentos e experimentos adicionais.
+
+Tanto uma revisão do processo de identificação do modelo do sistema, quanto uma revisão do processo de projeto e implementação do controlador baseado em modelo interno são sugeridos para a retomada deste projeto. Para o processo de identificação, experimentos que explorem mais a dinâmica do sistema, como aqueles baseados em \textit{PRBS}, são sugeridos para a coleta de dados mais ricos, que possam levar à identificação de um modelo mais preciso, inclusive por métodos estatísticos. Já para o processo de projeto e implementação do controlador baseado em modelo interno, uma revisão detalhada do processo de projeto, incluindo a análise de estabilidade e robustez, é sugerida para a identificação de possíveis erros. Além disso, uma revisão detalhada da implementação, incluindo a validação de cada componente individualmente, é sugerida para a identificação de possíveis erros de implementação.
+
+Por fim, o desenvolvimento e a implementação de uma metodologia de validação melhor projetada para validar o comportamento do sistema perante perturbações há de beneficiar o estudo da planta. Para suportar tal metodologia, a padronização e automação de alguns aspectos é necessária. Primeiro, a região de operação considerada deve ser definida e explicitada desde o início do projeto, incluindo os valores iniciais da ação de controle e da variável controlada. Relacionado a tal padronização, mas importante por si só, é a definição tão exata e precisa quanto possível do grau de abertura da valvula que controla o fluxo de água. Por fim, a automação do processo de perturbação, por meio de um atuador dedicado, é sugerida para garantir a consistência e reprodutibilidade das perturbações aplicadas, o que é essencial para a coleta dos dados referentes a tais sinais e para a validação do comportamento do sistema perante tais perturbações.
 
 \bibliography{bibliografia}
 

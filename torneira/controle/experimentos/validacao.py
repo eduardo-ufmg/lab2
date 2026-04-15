@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-EXPERIMENT_NAME = "pi"  # Change to "imc" for the IMC experiment
+EXPERIMENT_NAME = "pizn"
 
 
 def main():
